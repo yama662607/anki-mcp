@@ -16,6 +16,9 @@ Coverage includes:
 - AnkiConnect connection failure and HTTP failure wrapping
 - staged creation and idempotent retry
 - staged creation from custom card type definitions
+- staged draft inspection
+- custom card type definition deprecation and active-only listing
+- batch staged create / commit / discard with mixed outcomes
 - MCP tool registration, annotations, resources, and end-to-end in-memory tool execution
 - commit idempotency
 - conflict detection after manual edit
@@ -35,6 +38,7 @@ Planned cases (gateway boundary):
 Planned end-to-end checks:
 - create staged draft -> open preview -> confirm -> commit
 - create staged draft -> preview -> user correction -> supersede -> commit latest
+- batch staged create -> finalize via batch discard or batch commit
 - GUI unavailable path returns recoverable structured error
 - semi-automated real Anki script: `docs/implementation/e2e-real-anki.md`
 

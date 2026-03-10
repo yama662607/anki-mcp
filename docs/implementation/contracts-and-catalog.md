@@ -18,6 +18,13 @@
 - Source of truth: `src/contracts/toolContracts.ts`
 - Runtime resource exposure: `src/mcp/contractsResource.ts`
 - Catalog resource URI: `anki://catalog/card-types`
+- Additional authoring tools:
+  - `list_card_type_definitions`
+  - `deprecate_card_type_definition`
+  - `get_staged_card`
+  - `create_staged_cards_batch`
+  - `commit_staged_cards_batch`
+  - `discard_staged_cards_batch`
 
 ## 1.4 validation error/warning model
 
@@ -52,4 +59,14 @@ Each card type includes:
 - Supersede workflow: source must be `staged`; old draft becomes `superseded`
 - Cleanup default: `72` hours
 - Study isolation: staged notes are suspended until commit
+- Batch operations are per-item and allow mixed success/failure in one response
 - Implementation: `src/services/draftService.ts`, `src/persistence/draftStore.ts`
+
+## 2.y custom card type lifecycle
+
+- Custom definitions are profile-scoped and stored in SQLite.
+- Status model: `active | deprecated`
+- `upsert_card_type_definition` reactivates a deprecated definition.
+- `list_card_types` returns active custom definitions only.
+- `list_card_type_definitions(includeDeprecated=true)` exposes deprecated definitions for audit and migration.
+- `create_staged_card` rejects deprecated custom `cardTypeId` values with `CONFLICT`.

@@ -31,6 +31,8 @@ export type CardTypeDefinition = CardTypeSummary & {
   fields: FieldSchema[];
 };
 
+export type CardTypeDefinitionStatus = 'active' | 'deprecated';
+
 export type ValidationIssue = {
   code: string;
   message: string;
@@ -126,5 +128,12 @@ export type NoteTypeUpsertOperation =
 export type CustomCardTypeDefinition = CardTypeDefinition & {
   source: 'custom';
   profileId: string;
+  status: CardTypeDefinitionStatus;
   updatedAt: string;
+  deprecatedAt?: string;
+};
+
+export type BatchResultSummary = {
+  succeeded: number;
+  failed: number;
 };

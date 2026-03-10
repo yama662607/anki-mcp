@@ -32,6 +32,41 @@ export const TOOL_CONTRACTS_V1 = {
         source: { enum: ['builtin', 'custom'] },
       },
     },
+    CustomCardTypeDefinition: {
+      type: 'object',
+      required: [
+        'cardTypeId',
+        'label',
+        'modelName',
+        'defaultDeck',
+        'requiredFields',
+        'optionalFields',
+        'renderIntent',
+        'allowedHtmlPolicy',
+        'fields',
+        'source',
+        'profileId',
+        'status',
+        'updatedAt',
+      ],
+      additionalProperties: false,
+      properties: {
+        cardTypeId: { type: 'string' },
+        label: { type: 'string' },
+        modelName: { type: 'string' },
+        defaultDeck: { type: 'string' },
+        requiredFields: { type: 'array', items: { type: 'string' } },
+        optionalFields: { type: 'array', items: { type: 'string' } },
+        renderIntent: { enum: ['recognition', 'production', 'cloze', 'mixed'] },
+        allowedHtmlPolicy: { enum: ['plain_text_only', 'safe_inline_html', 'trusted_html'] },
+        fields: { type: 'array', items: { $ref: '#/sharedTypes/FieldSchema' } },
+        source: { const: 'custom' },
+        profileId: { type: 'string' },
+        status: { enum: ['active', 'deprecated'] },
+        updatedAt: { type: 'string' },
+        deprecatedAt: { type: 'string' },
+      },
+    },
     FieldSchema: {
       type: 'object',
       required: ['name', 'required', 'type', 'allowedHtmlPolicy'],
@@ -264,6 +299,43 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
+    list_card_type_definitions: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          includeDeprecated: { type: 'boolean' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'items'],
+        properties: {
+          ...baseResponse.properties,
+          items: { type: 'array', items: { $ref: '#/sharedTypes/CustomCardTypeDefinition' } },
+        },
+      },
+    },
+    deprecate_card_type_definition: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'cardTypeId'],
+        properties: {
+          profileId: { type: 'string' },
+          cardTypeId: { type: 'string' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'cardType'],
+        properties: {
+          ...baseResponse.properties,
+          cardType: { $ref: '#/sharedTypes/CustomCardTypeDefinition' },
+        },
+      },
+    },
     get_card_type_schema: {
       request: {
         type: 'object',
@@ -335,6 +407,54 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
+    create_staged_cards_batch: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'items'],
+        properties: {
+          profileId: { type: 'string' },
+          items: { type: 'array' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'summary', 'results'],
+        properties: {
+          ...baseResponse.properties,
+          summary: {
+            type: 'object',
+            required: ['succeeded', 'failed'],
+            additionalProperties: false,
+            properties: {
+              succeeded: { type: 'number' },
+              failed: { type: 'number' },
+            },
+          },
+          results: { type: 'array' },
+        },
+      },
+    },
+    get_staged_card: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['draftId'],
+        properties: {
+          draftId: { type: 'string' },
+          profileId: { type: 'string' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'draft', 'cardType'],
+        properties: {
+          ...baseResponse.properties,
+          draft: { $ref: '#/sharedTypes/DraftRecord' },
+          cardType: { $ref: '#/sharedTypes/CardTypeSummary' },
+        },
+      },
+    },
     open_staged_card_preview: {
       request: {
         type: 'object',
@@ -375,6 +495,34 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
+    commit_staged_cards_batch: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'items'],
+        properties: {
+          profileId: { type: 'string' },
+          items: { type: 'array' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'summary', 'results'],
+        properties: {
+          ...baseResponse.properties,
+          summary: {
+            type: 'object',
+            required: ['succeeded', 'failed'],
+            additionalProperties: false,
+            properties: {
+              succeeded: { type: 'number' },
+              failed: { type: 'number' },
+            },
+          },
+          results: { type: 'array' },
+        },
+      },
+    },
     discard_staged_card: {
       request: {
         type: 'object',
@@ -392,6 +540,34 @@ export const TOOL_CONTRACTS_V1 = {
         properties: {
           ...baseResponse.properties,
           result: { type: 'object' },
+        },
+      },
+    },
+    discard_staged_cards_batch: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'items'],
+        properties: {
+          profileId: { type: 'string' },
+          items: { type: 'array' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'summary', 'results'],
+        properties: {
+          ...baseResponse.properties,
+          summary: {
+            type: 'object',
+            required: ['succeeded', 'failed'],
+            additionalProperties: false,
+            properties: {
+              succeeded: { type: 'number' },
+              failed: { type: 'number' },
+            },
+          },
+          results: { type: 'array' },
         },
       },
     },

@@ -1,6 +1,6 @@
 import { AppError } from '../contracts/errors.js';
 import { CARD_TYPES, CATALOG_VERSION, findCardType } from '../contracts/catalog.js';
-import type { CardTypeDefinition, CardTypeSummary, ValidationIssue } from '../contracts/types.js';
+import type { CardTypeDefinition, CardTypeSummary, CustomCardTypeDefinition, ValidationIssue } from '../contracts/types.js';
 import { DraftStore } from '../persistence/draftStore.js';
 import { normalizeTags, sortRecord } from '../utils/canonical.js';
 import { sanitizeByPolicy } from '../utils/sanitize.js';
@@ -41,7 +41,7 @@ export class CatalogService {
   }
 
   getCardTypeSchema(profileId: string, cardTypeId: string) {
-    const cardType = this.requireCardType(profileId, cardTypeId);
+    const cardType = this.requireCardType(profileId, cardTypeId, { allowDeprecated: true });
     return {
       catalogVersion: CATALOG_VERSION,
       cardType: this.toSummary(cardType),
@@ -49,8 +49,31 @@ export class CatalogService {
     };
   }
 
-  getCardTypeDefinition(profileId: string, cardTypeId: string): CardTypeDefinition {
-    return this.requireCardType(profileId, cardTypeId);
+  getCardTypeDefinition(profileId: string, cardTypeId: string, options?: { allowDeprecated?: boolean }): CardTypeDefinition {
+    return this.requireCardType(profileId, cardTypeId, options);
+  }
+
+  getCardTypeSummary(profileId: string, cardTypeId: string, options?: { allowDeprecated?: boolean }): CardTypeSummary {
+    return this.toSummary(this.requireCardType(profileId, cardTypeId, options));
+  }
+
+  listCardTypeDefinitions(
+    profileId: string,
+    options?: { includeDeprecated?: boolean },
+  ): { items: CustomCardTypeDefinition[] } {
+    return {
+      items: this.store.listCardTypeDefinitions(profileId, options),
+    };
+  }
+
+  deprecateCardTypeDefinition(profileId: string, cardTypeId: string): { cardType: CustomCardTypeDefinition } {
+    if (findCardType(cardTypeId)) {
+      throw new AppError('FORBIDDEN_OPERATION', `Builtin cardTypeId cannot be deprecated: ${cardTypeId}`);
+    }
+
+    return {
+      cardType: this.store.deprecateCardTypeDefinition(profileId, cardTypeId, new Date().toISOString()),
+    };
   }
 
   validateFields(input: ValidateFieldsInput): ValidateFieldsOutput {
@@ -149,9 +172,21 @@ export class CatalogService {
     }, updatedAt);
   }
 
-  private requireCardType(profileId: string, cardTypeId: string): CardTypeDefinition {
-    const custom = this.store.getCardTypeDefinition(profileId, cardTypeId);
+  private requireCardType(
+    profileId: string,
+    cardTypeId: string,
+    options?: { allowDeprecated?: boolean },
+  ): CardTypeDefinition {
+    const custom = this.store.getCardTypeDefinition(profileId, cardTypeId, {
+      includeDeprecated: true,
+    });
     if (custom) {
+      if (custom.status === 'deprecated' && !options?.allowDeprecated) {
+        throw new AppError('CONFLICT', `Custom cardTypeId is deprecated: ${cardTypeId}`, {
+          hint: 'Use an active card type definition or reactivate this one with upsert_card_type_definition.',
+          context: { cardTypeId, status: custom.status, deprecatedAt: custom.deprecatedAt },
+        });
+      }
       return custom;
     }
 

@@ -128,4 +128,45 @@ describe('CatalogService', () => {
 
     store.close();
   });
+
+  it('lists active custom card type definitions and supports deprecation', () => {
+    const { store, service } = createService();
+
+    service.upsertCustomCardTypeDefinition('default', {
+      cardTypeId: 'programming.v1.ts-concept',
+      label: 'TypeScript Concept',
+      modelName: 'ts.v1.concept',
+      defaultDeck: 'Programming::TypeScript::Concept',
+      source: 'custom',
+      requiredFields: ['Prompt', 'Answer'],
+      optionalFields: [],
+      renderIntent: 'production',
+      allowedHtmlPolicy: 'safe_inline_html',
+      fields: [
+        { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+        { name: 'Answer', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html' },
+      ],
+    });
+
+    const before = service.listCardTypeDefinitions('default');
+    expect(before.items).toHaveLength(1);
+    expect(before.items[0]?.status).toBe('active');
+
+    const deprecated = service.deprecateCardTypeDefinition('default', 'programming.v1.ts-concept');
+    expect(deprecated.cardType.cardTypeId).toBe('programming.v1.ts-concept');
+    expect(deprecated.cardType.status).toBe('deprecated');
+    expect(deprecated.cardType.deprecatedAt).toBeTypeOf('string');
+
+    const activeOnly = service.listCardTypeDefinitions('default');
+    expect(activeOnly.items).toHaveLength(0);
+
+    const withDeprecated = service.listCardTypeDefinitions('default', { includeDeprecated: true });
+    expect(withDeprecated.items).toHaveLength(1);
+    expect(withDeprecated.items[0]?.status).toBe('deprecated');
+
+    const listed = service.listCardTypes('default');
+    expect(listed.cardTypes.some((item) => item.cardTypeId === 'programming.v1.ts-concept')).toBe(false);
+
+    store.close();
+  });
 });

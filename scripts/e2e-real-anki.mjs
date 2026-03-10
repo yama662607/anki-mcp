@@ -9,6 +9,7 @@ const statePath = resolve(stateDir, 'real-anki-e2e-state.json');
 const scenario = process.env.ANKI_E2E_SCENARIO ?? 'start';
 const profileId = process.env.ANKI_E2E_PROFILE_ID;
 const finalize = process.env.ANKI_E2E_FINALIZE ?? 'discard';
+const mode = process.env.ANKI_E2E_MODE ?? 'single';
 
 if (!profileId) {
   console.error('ANKI_E2E_PROFILE_ID is required');
@@ -90,6 +91,7 @@ async function runStart() {
   console.log(JSON.stringify({
     ok: true,
     scenario: 'start',
+    mode,
     statePath,
     draftId: staged.draft.draftId,
     noteId: staged.draft.noteId,
@@ -98,34 +100,139 @@ async function runStart() {
   }, null, 2));
 }
 
+async function runBatchStart() {
+  await callTool('upsert_note_type', {
+    profileId,
+    modelName: 'e2e.v1.basic',
+    dryRun: false,
+    fields: [{ name: 'Prompt' }, { name: 'Answer' }],
+    templates: [{
+      name: 'Card 1',
+      front: '<div class="e2e">{{Prompt}}</div>',
+      back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>',
+    }],
+    css: '.card { background: #10151d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 16px; } .e2e { font-size: 18px; line-height: 1.6; }',
+  });
+
+  await callTool('upsert_card_type_definition', {
+    profileId,
+    definition: {
+      cardTypeId: 'e2e.v1.basic',
+      label: 'E2E Basic',
+      modelName: 'e2e.v1.basic',
+      defaultDeck: 'Testing::E2E',
+      requiredFields: ['Prompt', 'Answer'],
+      optionalFields: [],
+      renderIntent: 'production',
+      allowedHtmlPolicy: 'safe_inline_html',
+      fields: [
+        { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+        { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+      ],
+    },
+  });
+
+  const now = Date.now();
+  const staged = await callTool('create_staged_cards_batch', {
+    profileId,
+    items: [
+      {
+        itemId: 'batch-1',
+        clientRequestId: `real-e2e-batch-1-${now}`,
+        cardTypeId: 'e2e.v1.basic',
+        fields: { Prompt: 'E2E batch prompt 1', Answer: 'E2E batch answer 1' },
+      },
+      {
+        itemId: 'batch-2',
+        clientRequestId: `real-e2e-batch-2-${now}`,
+        cardTypeId: 'e2e.v1.basic',
+        fields: { Prompt: 'E2E batch prompt 2', Answer: 'E2E batch answer 2' },
+      },
+    ],
+  });
+
+  const firstSuccess = staged.results.find((item) => item.ok);
+  const preview = firstSuccess
+    ? await callTool('open_staged_card_preview', { profileId, draftId: firstSuccess.draft.draftId })
+    : null;
+
+  writeFileSync(statePath, JSON.stringify({
+    profileId,
+    mode,
+    items: staged.results
+      .filter((item) => item.ok)
+      .map((item) => ({ itemId: item.itemId, draftId: item.draft.draftId, noteId: item.draft.noteId })),
+    createdAt: new Date().toISOString(),
+  }, null, 2));
+
+  console.log(JSON.stringify({
+    ok: true,
+    scenario: 'start',
+    mode,
+    statePath,
+    summary: staged.summary,
+    preview: preview?.preview ?? null,
+    nextStep: 'Rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=commit|discard to finalize the staged batch.',
+  }, null, 2));
+}
+
 async function runFinalize() {
   const state = JSON.parse(readFileSync(statePath, 'utf8'));
   let result;
 
-  if (finalize === 'commit') {
-    result = await callTool('commit_staged_card', {
-      profileId: state.profileId,
-      draftId: state.draftId,
-      reviewDecision: {
-        targetIdentityMatched: true,
-        questionConfirmed: true,
-        answerConfirmed: true,
-        reviewedAt: new Date().toISOString(),
-        reviewer: 'user',
-      },
-    });
+  if (state.mode === 'batch') {
+    if (finalize === 'commit') {
+      result = await callTool('commit_staged_cards_batch', {
+        profileId: state.profileId,
+        items: state.items.map((item) => ({
+          itemId: item.itemId,
+          draftId: item.draftId,
+          reviewDecision: {
+            targetIdentityMatched: true,
+            questionConfirmed: true,
+            answerConfirmed: true,
+            reviewedAt: new Date().toISOString(),
+            reviewer: 'user',
+          },
+        })),
+      });
+    } else {
+      result = await callTool('discard_staged_cards_batch', {
+        profileId: state.profileId,
+        items: state.items.map((item) => ({
+          itemId: item.itemId,
+          draftId: item.draftId,
+          reason: 'user_request',
+        })),
+      });
+    }
   } else {
-    result = await callTool('discard_staged_card', {
-      profileId: state.profileId,
-      draftId: state.draftId,
-      reason: 'user_request',
-    });
+    if (finalize === 'commit') {
+      result = await callTool('commit_staged_card', {
+        profileId: state.profileId,
+        draftId: state.draftId,
+        reviewDecision: {
+          targetIdentityMatched: true,
+          questionConfirmed: true,
+          answerConfirmed: true,
+          reviewedAt: new Date().toISOString(),
+          reviewer: 'user',
+        },
+      });
+    } else {
+      result = await callTool('discard_staged_card', {
+        profileId: state.profileId,
+        draftId: state.draftId,
+        reason: 'user_request',
+      });
+    }
   }
 
   rmSync(statePath, { force: true });
   console.log(JSON.stringify({
     ok: true,
     scenario: 'finalize',
+    mode: state.mode ?? 'single',
     finalize,
     result,
   }, null, 2));
@@ -134,7 +241,11 @@ async function runFinalize() {
 try {
   await client.connect(transport);
   if (scenario === 'start') {
-    await runStart();
+    if (mode === 'batch') {
+      await runBatchStart();
+    } else {
+      await runStart();
+    }
   } else if (scenario === 'finalize') {
     await runFinalize();
   } else {

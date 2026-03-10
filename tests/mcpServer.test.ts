@@ -63,6 +63,8 @@ describe('MCP server', () => {
       expect(byName.get('list_note_types')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('upsert_note_type')?.annotations?.readOnlyHint).toBe(false);
       expect(byName.get('discard_staged_card')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('get_staged_card')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('create_staged_cards_batch')?.annotations?.readOnlyHint).toBe(false);
     } finally {
       await closeContext(context);
     }
@@ -79,8 +81,13 @@ describe('MCP server', () => {
 
       const contracts = await context.client.readResource({ uri: 'anki://contracts/v1/tools' });
       const payload = JSON.parse((contracts.contents[0] as { text: string }).text) as { tools?: Record<string, unknown> };
+      expect(payload).toHaveProperty('contractVersion', '1.0.0');
       expect(payload.tools).toHaveProperty('upsert_note_type');
       expect(payload.tools).toHaveProperty('upsert_card_type_definition');
+      expect(payload.tools).toHaveProperty('commit_staged_card');
+      expect(payload.tools).toHaveProperty('get_staged_card');
+      expect(payload.tools).toHaveProperty('create_staged_cards_batch');
+      expect(payload.tools).toHaveProperty('list_card_type_definitions');
     } finally {
       await closeContext(context);
     }
@@ -165,6 +172,162 @@ describe('MCP server', () => {
 
       expect(preview.preview.opened).toBe(true);
       expect(preview.preview.selectedNoteId).toBe(staged.draft.noteId);
+    } finally {
+      await closeContext(context);
+    }
+  });
+
+  it('returns structured MCP errors for invalid arguments and profile mismatches', async () => {
+    const context = await createConnectedContext();
+
+    try {
+      const invalid = parseToolResult(await context.client.callTool({
+        name: 'create_staged_card',
+        arguments: {
+          profileId: 'default',
+          clientRequestId: 'mcp-server-test-invalid',
+          cardTypeId: 'language.v1.basic-bilingual',
+          fields: { Front: 'missing-back' },
+        },
+      }));
+
+      expect(invalid.code).toBe('INVALID_ARGUMENT');
+      expect(invalid.retryable).toBe(false);
+
+      const staged = parseToolResult(await context.client.callTool({
+        name: 'create_staged_card',
+        arguments: {
+          profileId: 'profile-a',
+          clientRequestId: 'mcp-server-test-profile',
+          cardTypeId: 'language.v1.basic-bilingual',
+          fields: { Front: 'x', Back: 'y' },
+        },
+      }));
+
+      const mismatch = parseToolResult(await context.client.callTool({
+        name: 'commit_staged_card',
+        arguments: {
+          profileId: 'profile-b',
+          draftId: staged.draft.draftId,
+          reviewDecision: {
+            targetIdentityMatched: true,
+            questionConfirmed: true,
+            answerConfirmed: true,
+            reviewedAt: new Date().toISOString(),
+            reviewer: 'user',
+          },
+        },
+      }));
+
+      expect(mismatch.code).toBe('PROFILE_SCOPE_MISMATCH');
+      expect(mismatch.retryable).toBe(false);
+    } finally {
+      await closeContext(context);
+    }
+  });
+
+  it('executes card-type lifecycle, draft inspection, and batch flows through MCP tools', async () => {
+    const context = await createConnectedContext();
+
+    try {
+      const custom = parseToolResult(await context.client.callTool({
+        name: 'upsert_card_type_definition',
+        arguments: {
+          profileId: 'default',
+          definition: {
+            cardTypeId: 'programming.v1.ts-output',
+            label: 'TypeScript Output',
+            modelName: 'Basic',
+            defaultDeck: 'Programming::TypeScript::Output',
+            requiredFields: ['Front', 'Back'],
+            optionalFields: [],
+            renderIntent: 'production',
+            allowedHtmlPolicy: 'safe_inline_html',
+            fields: [
+              { name: 'Front', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+              { name: 'Back', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html' },
+            ],
+          },
+        },
+      }));
+
+      expect(custom.cardType.cardTypeId).toBe('programming.v1.ts-output');
+
+      const batchCreate = parseToolResult(await context.client.callTool({
+        name: 'create_staged_cards_batch',
+        arguments: {
+          profileId: 'default',
+          items: [
+            {
+              itemId: 'ok-1',
+              clientRequestId: 'mcp-batch-1',
+              cardTypeId: 'programming.v1.ts-output',
+              fields: { Front: 'Q', Back: 'A' },
+            },
+            {
+              itemId: 'bad-1',
+              clientRequestId: 'mcp-batch-2',
+              cardTypeId: 'programming.v1.ts-output',
+              fields: { Front: 'Q only' },
+            },
+          ],
+        },
+      }));
+
+      expect(batchCreate.summary).toEqual({ succeeded: 1, failed: 1 });
+      expect(batchCreate.results[0]?.ok).toBe(true);
+      expect(batchCreate.results[1]?.error?.code).toBe('INVALID_ARGUMENT');
+
+      const stagedDraftId = batchCreate.results[0]?.draft?.draftId as string;
+
+      const detail = parseToolResult(await context.client.callTool({
+        name: 'get_staged_card',
+        arguments: {
+          profileId: 'default',
+          draftId: stagedDraftId,
+        },
+      }));
+
+      expect(detail.draft.draftId).toBe(stagedDraftId);
+      expect(detail.cardType.cardTypeId).toBe('programming.v1.ts-output');
+
+      const listedBefore = parseToolResult(await context.client.callTool({
+        name: 'list_card_type_definitions',
+        arguments: { profileId: 'default' },
+      }));
+      expect(listedBefore.items).toHaveLength(1);
+
+      const deprecated = parseToolResult(await context.client.callTool({
+        name: 'deprecate_card_type_definition',
+        arguments: {
+          profileId: 'default',
+          cardTypeId: 'programming.v1.ts-output',
+        },
+      }));
+      expect(deprecated.cardType.status).toBe('deprecated');
+
+      const listedActive = parseToolResult(await context.client.callTool({
+        name: 'list_card_type_definitions',
+        arguments: { profileId: 'default' },
+      }));
+      expect(listedActive.items).toHaveLength(0);
+
+      const listedAll = parseToolResult(await context.client.callTool({
+        name: 'list_card_type_definitions',
+        arguments: { profileId: 'default', includeDeprecated: true },
+      }));
+      expect(listedAll.items).toHaveLength(1);
+
+      const rejected = parseToolResult(await context.client.callTool({
+        name: 'create_staged_card',
+        arguments: {
+          profileId: 'default',
+          clientRequestId: 'mcp-deprecated-1',
+          cardTypeId: 'programming.v1.ts-output',
+          fields: { Front: 'Q', Back: 'A' },
+        },
+      }));
+      expect(rejected.code).toBe('CONFLICT');
     } finally {
       await closeContext(context);
     }

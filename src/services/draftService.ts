@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { AppError } from '../contracts/errors.js';
-import type { DraftRecord, DraftState, ReviewDecision } from '../contracts/types.js';
+import { AppError, asAppError } from '../contracts/errors.js';
+import type { BatchResultSummary, DraftRecord, DraftState, ReviewDecision } from '../contracts/types.js';
 import { toCanonicalJson, normalizeTags } from '../utils/canonical.js';
 import { sha256 } from '../utils/hash.js';
 import { resolveProfileId } from '../utils/profile.js';
@@ -195,6 +195,31 @@ export class DraftService {
         selectedCardIds: preview.selectedCardIds,
         browserQuery: preview.browserQuery,
       },
+    };
+  }
+
+  async getStagedCard(input: {
+    draftId: string;
+    profileId?: string;
+  }): Promise<{
+    contractVersion: '1.0.0';
+    profileId: string;
+    draft: DraftRecord;
+    cardType: ReturnType<CatalogService['getCardTypeSummary']>;
+  }> {
+    const profileId = resolveProfileId({
+      providedProfileId: input.profileId,
+      activeProfileId: this.config.activeProfileId,
+      requireExplicitForWrite: false,
+    });
+
+    const draft = this.requireDraft(profileId, input.draftId);
+
+    return {
+      contractVersion: '1.0.0',
+      profileId,
+      draft,
+      cardType: this.catalogService.getCardTypeSummary(profileId, draft.cardTypeId, { allowDeprecated: true }),
     };
   }
 
@@ -472,6 +497,196 @@ export class DraftService {
     };
   }
 
+  async createStagedCardsBatch(input: {
+    profileId: string;
+    items: Array<{
+      itemId: string;
+      clientRequestId: string;
+      cardTypeId: string;
+      fields: Record<string, string>;
+      deckName?: string;
+      tags?: string[];
+      supersedesDraftId?: string;
+    }>;
+  }): Promise<{
+    contractVersion: '1.0.0';
+    profileId: string;
+    summary: BatchResultSummary;
+    results: Array<
+      | { itemId: string; ok: true; draft: DraftRecord }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    >;
+  }> {
+    const profileId = resolveProfileId({
+      providedProfileId: input.profileId,
+      activeProfileId: this.config.activeProfileId,
+      requireExplicitForWrite: true,
+    });
+
+    const results: Array<
+      | { itemId: string; ok: true; draft: DraftRecord }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    > = [];
+
+    for (const item of input.items) {
+      try {
+        const created = await this.createStagedCard({
+          profileId,
+          clientRequestId: item.clientRequestId,
+          cardTypeId: item.cardTypeId,
+          fields: item.fields,
+          deckName: item.deckName,
+          tags: item.tags,
+          supersedesDraftId: item.supersedesDraftId,
+        });
+        results.push({ itemId: item.itemId, ok: true, draft: created.draft });
+      } catch (error) {
+        results.push({ itemId: item.itemId, ok: false, error: asAppError(error).toPayload() });
+      }
+    }
+
+    return {
+      contractVersion: '1.0.0',
+      profileId,
+      summary: summarizeBatch(results),
+      results,
+    };
+  }
+
+  async commitStagedCardsBatch(input: {
+    profileId: string;
+    items: Array<{
+      itemId: string;
+      draftId: string;
+      reviewDecision: ReviewDecision;
+    }>;
+  }): Promise<{
+    contractVersion: '1.0.0';
+    profileId: string;
+    summary: BatchResultSummary;
+    results: Array<
+      | {
+          itemId: string;
+          ok: true;
+          result: {
+            status: 'committed' | 'already_committed';
+            draftId: string;
+            noteId: number;
+            cardIds: number[];
+            committedAt: string;
+          };
+        }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    >;
+  }> {
+    const profileId = resolveProfileId({
+      providedProfileId: input.profileId,
+      activeProfileId: this.config.activeProfileId,
+      requireExplicitForWrite: true,
+    });
+
+    const results: Array<
+      | {
+          itemId: string;
+          ok: true;
+          result: {
+            status: 'committed' | 'already_committed';
+            draftId: string;
+            noteId: number;
+            cardIds: number[];
+            committedAt: string;
+          };
+        }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    > = [];
+
+    for (const item of input.items) {
+      try {
+        const committed = await this.commitStagedCard({
+          profileId,
+          draftId: item.draftId,
+          reviewDecision: item.reviewDecision,
+        });
+        results.push({ itemId: item.itemId, ok: true, result: committed.result });
+      } catch (error) {
+        results.push({ itemId: item.itemId, ok: false, error: asAppError(error).toPayload() });
+      }
+    }
+
+    return {
+      contractVersion: '1.0.0',
+      profileId,
+      summary: summarizeBatch(results),
+      results,
+    };
+  }
+
+  async discardStagedCardsBatch(input: {
+    profileId: string;
+    items: Array<{
+      itemId: string;
+      draftId: string;
+      reason?: 'user_request' | 'cleanup' | 'superseded' | 'conflict_recovery';
+    }>;
+  }): Promise<{
+    contractVersion: '1.0.0';
+    profileId: string;
+    summary: BatchResultSummary;
+    results: Array<
+      | {
+          itemId: string;
+          ok: true;
+          result: {
+            status: 'discarded' | 'already_discarded';
+            draftId: string;
+            discardedAt: string;
+            deletedNoteId?: number;
+          };
+        }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    >;
+  }> {
+    const profileId = resolveProfileId({
+      providedProfileId: input.profileId,
+      activeProfileId: this.config.activeProfileId,
+      requireExplicitForWrite: true,
+    });
+
+    const results: Array<
+      | {
+          itemId: string;
+          ok: true;
+          result: {
+            status: 'discarded' | 'already_discarded';
+            draftId: string;
+            discardedAt: string;
+            deletedNoteId?: number;
+          };
+        }
+      | { itemId: string; ok: false; error: ReturnType<AppError['toPayload']> }
+    > = [];
+
+    for (const item of input.items) {
+      try {
+        const discarded = await this.discardStagedCard({
+          profileId,
+          draftId: item.draftId,
+          reason: item.reason,
+        });
+        results.push({ itemId: item.itemId, ok: true, result: discarded.result });
+      } catch (error) {
+        results.push({ itemId: item.itemId, ok: false, error: asAppError(error).toPayload() });
+      }
+    }
+
+    return {
+      contractVersion: '1.0.0',
+      profileId,
+      summary: summarizeBatch(results),
+      results,
+    };
+  }
+
   getCatalogResourcePayload() {
     return {
       contractVersion: '1.0.0',
@@ -525,6 +740,20 @@ export class DraftService {
     }
   }
 
+  private requireDraft(profileId: string, draftId: string): DraftRecord {
+    const draft = this.store.getDraft(profileId, draftId);
+    if (!draft) {
+      const foreignDraft = this.store.findDraftById(draftId);
+      if (foreignDraft && foreignDraft.profileId !== profileId) {
+        throw new AppError('PROFILE_SCOPE_MISMATCH', 'draftId belongs to a different profile', {
+          context: { requestedProfileId: profileId, draftProfileId: foreignDraft.profileId },
+        });
+      }
+      throw new AppError('NOT_FOUND', `Draft not found: ${draftId}`);
+    }
+    return draft;
+  }
+
   private logLifecycleEvent(event: string, context: Record<string, unknown>): void {
     const payload = {
       event,
@@ -533,4 +762,12 @@ export class DraftService {
     };
     console.error(JSON.stringify(payload));
   }
+}
+
+function summarizeBatch(results: Array<{ ok: boolean }>): BatchResultSummary {
+  const succeeded = results.filter((item) => item.ok).length;
+  return {
+    succeeded,
+    failed: results.length - succeeded,
+  };
 }

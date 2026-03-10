@@ -43,6 +43,8 @@ export function createRuntime(): AppRuntime {
       instructions: [
         'Use this flow for card creation: list_card_types -> get_card_type_schema -> validate_card_fields -> create_staged_card -> open_staged_card_preview -> commit_staged_card or discard_staged_card.',
         'Use note-type authoring as: list_note_types -> get_note_type_schema -> upsert_note_type(dryRun=true) -> upsert_note_type(dryRun=false) -> upsert_card_type_definition.',
+        'Use authoring management as: list_card_type_definitions -> deprecate_card_type_definition, and draft inspection as get_staged_card.',
+        'For multiple notes, prefer create_staged_cards_batch and batch finalize tools with explicit per-item review decisions.',
         'Never commit without explicit user approval in natural language.',
         'Write tools require explicit profileId and create_staged_card requires clientRequestId.',
       ].join(' '),

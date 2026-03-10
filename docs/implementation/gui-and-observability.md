@@ -12,8 +12,8 @@
 
 ## 4.1 read/write boundary
 
-- Read-ish tools: `list_card_types`, `get_card_type_schema`, `validate_card_fields`, `open_staged_card_preview`, `list_staged_cards`
-- Write tools: `create_staged_card`, `commit_staged_card`, `discard_staged_card`, `cleanup_staged_cards`
+- Read-ish tools: `list_card_types`, `list_card_type_definitions`, `get_card_type_schema`, `validate_card_fields`, `get_staged_card`, `open_staged_card_preview`, `list_staged_cards`
+- Write tools: `create_staged_card`, `create_staged_cards_batch`, `commit_staged_card`, `commit_staged_cards_batch`, `discard_staged_card`, `discard_staged_cards_batch`, `cleanup_staged_cards`, `deprecate_card_type_definition`
 
 ## 4.2 / 4.8 structured errors and canonical registry
 
@@ -44,6 +44,8 @@ Primary runtime metrics (derived from logs/store):
 - `discard_rate{profileId}`
 - `cleanup_count{profileId}`
 - `conflict_count{profileId}`
+- `batch_item_success_count{operation,profileId}`
+- `batch_item_failure_count{operation,profileId}`
 
 ## 4.5 profile-scoped identifiers
 

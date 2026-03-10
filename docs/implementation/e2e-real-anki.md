@@ -22,6 +22,18 @@ What it does:
 - opens Anki preview
 - saves the staged state to `.data/real-anki-e2e-state.json`
 
+## Batch smoke run
+
+```bash
+ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch npm run e2e:anki
+```
+
+What it does:
+- upserts the same minimal `e2e.v1.basic` note type and card type definition
+- creates two staged drafts with `create_staged_cards_batch`
+- opens preview for the first staged draft
+- saves batch state to `.data/real-anki-e2e-state.json`
+
 ## Finalize after visual review
 
 Commit:
@@ -34,6 +46,12 @@ Discard:
 
 ```bash
 ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_SCENARIO=finalize ANKI_E2E_FINALIZE=discard npm run e2e:anki
+```
+
+Batch finalize:
+
+```bash
+ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch ANKI_E2E_SCENARIO=finalize ANKI_E2E_FINALIZE=discard npm run e2e:anki
 ```
 
 ## Why this is semi-automated

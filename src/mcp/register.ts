@@ -1,10 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   cleanupStagedCardsInputSchema,
+  commitStagedCardsBatchInputSchema,
   commitStagedCardInputSchema,
+  createStagedCardsBatchInputSchema,
   createStagedCardInputSchema,
+  deprecateCardTypeDefinitionInputSchema,
   getCardTypeSchemaInputSchema,
   getNoteTypeSchemaInputSchema,
+  getStagedCardInputSchema,
+  listCardTypeDefinitionsInputSchema,
   listCardTypesInputSchema,
   listNoteTypesInputSchema,
   listStagedCardsInputSchema,
@@ -12,6 +17,7 @@ import {
   upsertCardTypeDefinitionInputSchema,
   upsertNoteTypeInputSchema,
   validateCardFieldsInputSchema,
+  discardStagedCardsBatchInputSchema,
   discardStagedCardInputSchema,
 } from '../contracts/schemas.js';
 import { CatalogService } from '../services/catalogService.js';
@@ -86,6 +92,62 @@ export function registerMcpHandlers(server: McpServer, services: {
           ...services.catalogService.listCardTypes(profileId),
         };
         return successResult(payload);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_card_type_definitions',
+    {
+      title: 'List Card Type Definitions',
+      description: 'List profile-scoped custom card type definitions. Active only by default.',
+      inputSchema: listCardTypeDefinitionsInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(listCardTypeDefinitionsInputSchema, input);
+        const profileId = resolveProfileId({
+          providedProfileId: args.profileId,
+          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
+          requireExplicitForWrite: false,
+        });
+        return successResult({
+          contractVersion: '1.0.0',
+          profileId,
+          ...services.catalogService.listCardTypeDefinitions(profileId, {
+            includeDeprecated: args.includeDeprecated,
+          }),
+        });
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'deprecate_card_type_definition',
+    {
+      title: 'Deprecate Card Type Definition',
+      description: 'Mark a custom card type definition as deprecated without deleting it.',
+      inputSchema: deprecateCardTypeDefinitionInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(deprecateCardTypeDefinitionInputSchema, input);
+        const profileId = resolveProfileId({
+          providedProfileId: args.profileId,
+          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
+          requireExplicitForWrite: true,
+        });
+        return successResult({
+          contractVersion: '1.0.0',
+          profileId,
+          ...services.catalogService.deprecateCardTypeDefinition(profileId, args.cardTypeId),
+        });
       } catch (error) {
         return errorResult(error);
       }
@@ -250,6 +312,42 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
+    'create_staged_cards_batch',
+    {
+      title: 'Create Staged Cards Batch',
+      description: 'Create multiple staged drafts with per-item success and error reporting.',
+      inputSchema: createStagedCardsBatchInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(createStagedCardsBatchInputSchema, input);
+        return successResult(await services.draftService.createStagedCardsBatch(args));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_staged_card',
+    {
+      title: 'Get Staged Card',
+      description: 'Read stored metadata and field contents for one draft.',
+      inputSchema: getStagedCardInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(getStagedCardInputSchema, input);
+        return successResult(await services.draftService.getStagedCard(args));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'open_staged_card_preview',
     {
       title: 'Open Staged Card Preview',
@@ -288,6 +386,24 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
+    'commit_staged_cards_batch',
+    {
+      title: 'Commit Staged Cards Batch',
+      description: 'Commit multiple drafts with per-item review decisions and outcomes.',
+      inputSchema: commitStagedCardsBatchInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(commitStagedCardsBatchInputSchema, input);
+        return successResult(await services.draftService.commitStagedCardsBatch(args));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'discard_staged_card',
     {
       title: 'Discard Staged Card',
@@ -300,6 +416,24 @@ export function registerMcpHandlers(server: McpServer, services: {
         const args = parseOrThrow(discardStagedCardInputSchema, input);
         const payload = await services.draftService.discardStagedCard(args);
         return successResult(payload);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'discard_staged_cards_batch',
+    {
+      title: 'Discard Staged Cards Batch',
+      description: 'Discard multiple drafts with per-item success and idempotent already_discarded results.',
+      inputSchema: discardStagedCardsBatchInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(discardStagedCardsBatchInputSchema, input);
+        return successResult(await services.draftService.discardStagedCardsBatch(args));
       } catch (error) {
         return errorResult(error);
       }

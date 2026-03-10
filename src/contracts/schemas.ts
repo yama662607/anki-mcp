@@ -6,6 +6,7 @@ export const profileIdSchema = z.string().min(1).max(120);
 export const cardTypeIdSchema = z.string().min(1).max(120);
 export const draftIdSchema = z.string().min(1).max(120);
 export const clientRequestIdSchema = z.string().min(1).max(120);
+export const itemIdSchema = z.string().min(1).max(120);
 export const modelNameSchema = z.string().min(1).max(180);
 export const fieldNameSchema = z.string().min(1).max(180);
 export const templateNameSchema = z.string().min(1).max(180);
@@ -23,6 +24,13 @@ export const reviewDecisionSchema = z
   .strict();
 
 export const listCardTypesInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
+
+export const listCardTypeDefinitionsInputSchema = z
+  .object({
+    profileId: profileIdSchema.optional(),
+    includeDeprecated: z.boolean().optional(),
+  })
+  .strict();
 
 export const listNoteTypesInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
 
@@ -122,6 +130,32 @@ export const createStagedCardInputSchema = z
   })
   .strict();
 
+export const createStagedCardsBatchInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    items: z.array(
+      z
+        .object({
+          itemId: itemIdSchema,
+          clientRequestId: clientRequestIdSchema,
+          cardTypeId: cardTypeIdSchema,
+          fields: z.record(z.string(), z.string()),
+          deckName: z.string().min(1).max(180).optional(),
+          tags: z.array(z.string()).optional(),
+          supersedesDraftId: draftIdSchema.optional(),
+        })
+        .strict(),
+    ).min(1).max(100),
+  })
+  .strict();
+
+export const getStagedCardInputSchema = z
+  .object({
+    draftId: draftIdSchema,
+    profileId: profileIdSchema.optional(),
+  })
+  .strict();
+
 export const openStagedCardPreviewInputSchema = z
   .object({
     draftId: draftIdSchema,
@@ -137,11 +171,48 @@ export const commitStagedCardInputSchema = z
   })
   .strict();
 
+export const commitStagedCardsBatchInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    items: z.array(
+      z
+        .object({
+          itemId: itemIdSchema,
+          draftId: draftIdSchema,
+          reviewDecision: reviewDecisionSchema,
+        })
+        .strict(),
+    ).min(1).max(100),
+  })
+  .strict();
+
 export const discardStagedCardInputSchema = z
   .object({
     draftId: draftIdSchema,
     profileId: profileIdSchema,
     reason: z.enum(['user_request', 'cleanup', 'superseded', 'conflict_recovery']).optional(),
+  })
+  .strict();
+
+export const discardStagedCardsBatchInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    items: z.array(
+      z
+        .object({
+          itemId: itemIdSchema,
+          draftId: draftIdSchema,
+          reason: z.enum(['user_request', 'cleanup', 'superseded', 'conflict_recovery']).optional(),
+        })
+        .strict(),
+    ).min(1).max(100),
+  })
+  .strict();
+
+export const deprecateCardTypeDefinitionInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    cardTypeId: cardTypeIdSchema,
   })
   .strict();
 
@@ -163,6 +234,7 @@ export const cleanupStagedCardsInputSchema = z
   .strict();
 
 export type ListCardTypesInput = z.infer<typeof listCardTypesInputSchema>;
+export type ListCardTypeDefinitionsInput = z.infer<typeof listCardTypeDefinitionsInputSchema>;
 export type ListNoteTypesInput = z.infer<typeof listNoteTypesInputSchema>;
 export type GetNoteTypeSchemaInput = z.infer<typeof getNoteTypeSchemaInputSchema>;
 export type UpsertNoteTypeInput = z.infer<typeof upsertNoteTypeInputSchema>;
@@ -170,8 +242,13 @@ export type UpsertCardTypeDefinitionInput = z.infer<typeof upsertCardTypeDefinit
 export type GetCardTypeSchemaInput = z.infer<typeof getCardTypeSchemaInputSchema>;
 export type ValidateCardFieldsInput = z.infer<typeof validateCardFieldsInputSchema>;
 export type CreateStagedCardInput = z.infer<typeof createStagedCardInputSchema>;
+export type CreateStagedCardsBatchInput = z.infer<typeof createStagedCardsBatchInputSchema>;
+export type GetStagedCardInput = z.infer<typeof getStagedCardInputSchema>;
 export type OpenStagedCardPreviewInput = z.infer<typeof openStagedCardPreviewInputSchema>;
 export type CommitStagedCardInput = z.infer<typeof commitStagedCardInputSchema>;
+export type CommitStagedCardsBatchInput = z.infer<typeof commitStagedCardsBatchInputSchema>;
 export type DiscardStagedCardInput = z.infer<typeof discardStagedCardInputSchema>;
+export type DiscardStagedCardsBatchInput = z.infer<typeof discardStagedCardsBatchInputSchema>;
+export type DeprecateCardTypeDefinitionInput = z.infer<typeof deprecateCardTypeDefinitionInputSchema>;
 export type ListStagedCardsInput = z.infer<typeof listStagedCardsInputSchema>;
 export type CleanupStagedCardsInput = z.infer<typeof cleanupStagedCardsInputSchema>;

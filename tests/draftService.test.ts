@@ -269,6 +269,100 @@ describe('DraftService', () => {
     store.close();
   });
 
+  it('returns already_discarded on second discard and rejects discarding committed drafts', async () => {
+    const { service, store } = createService();
+    const staged = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-9',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'x', Back: 'y' },
+    });
+
+    const firstDiscard = await service.discardStagedCard({
+      profileId: 'default',
+      draftId: staged.draft.draftId,
+    });
+    const secondDiscard = await service.discardStagedCard({
+      profileId: 'default',
+      draftId: staged.draft.draftId,
+    });
+
+    expect(firstDiscard.result.status).toBe('discarded');
+    expect(secondDiscard.result.status).toBe('already_discarded');
+
+    const committed = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-10',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'commit', Back: 'me' },
+    });
+
+    await service.commitStagedCard({
+      profileId: 'default',
+      draftId: committed.draft.draftId,
+      reviewDecision: {
+        targetIdentityMatched: true,
+        questionConfirmed: true,
+        answerConfirmed: true,
+        reviewedAt: new Date().toISOString(),
+        reviewer: 'user',
+      },
+    });
+
+    await expect(
+      service.discardStagedCard({
+        profileId: 'default',
+        draftId: committed.draft.draftId,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_STATE_TRANSITION' });
+
+    store.close();
+  });
+
+  it('rejects invalid supersede sources and profile-mismatched supersede chains', async () => {
+    const { service, store } = createService();
+    const original = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-11a',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'first', Back: 'first' },
+    });
+
+    await service.discardStagedCard({
+      profileId: 'default',
+      draftId: original.draft.draftId,
+    });
+
+    await expect(
+      service.createStagedCard({
+        profileId: 'default',
+        clientRequestId: 'req-11b',
+        cardTypeId: 'language.v1.basic-bilingual',
+        fields: { Front: 'second', Back: 'second' },
+        supersedesDraftId: original.draft.draftId,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_SUPERSEDE_SOURCE' });
+
+    const foreign = await service.createStagedCard({
+      profileId: 'profile-a',
+      clientRequestId: 'req-11c',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'foreign', Back: 'foreign' },
+    });
+
+    await expect(
+      service.createStagedCard({
+        profileId: 'profile-b',
+        clientRequestId: 'req-11d',
+        cardTypeId: 'language.v1.basic-bilingual',
+        fields: { Front: 'local', Back: 'local' },
+        supersedesDraftId: foreign.draft.draftId,
+      }),
+    ).rejects.toMatchObject({ code: 'PROFILE_SCOPE_MISMATCH' });
+
+    store.close();
+  });
+
   it('creates staged draft from a custom card type definition', async () => {
     const store = new DraftStore(dbPath);
     const gateway = new MemoryGateway();
@@ -310,6 +404,181 @@ describe('DraftService', () => {
     expect(staged.draft.cardTypeId).toBe('programming.v1.ts-concept');
     expect(staged.draft.deckName).toBe('Programming::TypeScript::Concept');
     expect(staged.draft.fields.Prompt).toBe('any と unknown の違いは？');
+
+    store.close();
+  });
+
+  it('returns stored staged draft details and blocks cross-profile inspection', async () => {
+    const { service, store } = createService();
+    const staged = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-12',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'hello', Back: 'こんにちは' },
+      tags: ['lesson-1'],
+    });
+
+    const detail = await service.getStagedCard({
+      profileId: 'default',
+      draftId: staged.draft.draftId,
+    });
+
+    expect(detail.draft.draftId).toBe(staged.draft.draftId);
+    expect(detail.draft.fields.Front).toBe('hello');
+    expect(detail.cardType.cardTypeId).toBe('language.v1.basic-bilingual');
+
+    await expect(
+      service.getStagedCard({
+        profileId: 'other-profile',
+        draftId: staged.draft.draftId,
+      }),
+    ).rejects.toMatchObject({ code: 'PROFILE_SCOPE_MISMATCH' });
+
+    store.close();
+  });
+
+  it('creates staged cards in batch with mixed outcomes', async () => {
+    const { service, store } = createService();
+
+    const batch = await service.createStagedCardsBatch({
+      profileId: 'default',
+      items: [
+        {
+          itemId: 'ok-1',
+          clientRequestId: 'req-batch-1',
+          cardTypeId: 'language.v1.basic-bilingual',
+          fields: { Front: 'a', Back: 'b' },
+        },
+        {
+          itemId: 'bad-1',
+          clientRequestId: 'req-batch-2',
+          cardTypeId: 'language.v1.basic-bilingual',
+          fields: { Front: 'missing-back' },
+        },
+      ],
+    });
+
+    expect(batch.summary.succeeded).toBe(1);
+    expect(batch.summary.failed).toBe(1);
+    expect(batch.results[0]).toMatchObject({ itemId: 'ok-1', ok: true });
+    expect(batch.results[1]).toMatchObject({
+      itemId: 'bad-1',
+      ok: false,
+      error: { code: 'INVALID_ARGUMENT' },
+    });
+
+    store.close();
+  });
+
+  it('commits and discards drafts in batch with per-item semantics', async () => {
+    const { service, store } = createService();
+    const first = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-batch-3',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'a', Back: 'b' },
+    });
+    const second = await service.createStagedCard({
+      profileId: 'default',
+      clientRequestId: 'req-batch-4',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'c', Back: 'd' },
+    });
+
+    const committed = await service.commitStagedCardsBatch({
+      profileId: 'default',
+      items: [
+        {
+          itemId: 'commit-ok',
+          draftId: first.draft.draftId,
+          reviewDecision: {
+            targetIdentityMatched: true,
+            questionConfirmed: true,
+            answerConfirmed: true,
+            reviewedAt: new Date().toISOString(),
+            reviewer: 'user',
+          },
+        },
+        {
+          itemId: 'commit-bad',
+          draftId: second.draft.draftId,
+          reviewDecision: {
+            targetIdentityMatched: false,
+            questionConfirmed: true,
+            answerConfirmed: true,
+            reviewedAt: new Date().toISOString(),
+            reviewer: 'user',
+          },
+        },
+      ],
+    });
+
+    expect(committed.summary.succeeded).toBe(1);
+    expect(committed.summary.failed).toBe(1);
+    expect(committed.results[1]).toMatchObject({
+      itemId: 'commit-bad',
+      ok: false,
+      error: { code: 'INVALID_ARGUMENT' },
+    });
+
+    const discarded = await service.discardStagedCardsBatch({
+      profileId: 'default',
+      items: [
+        { itemId: 'discard-ok', draftId: second.draft.draftId, reason: 'user_request' },
+        { itemId: 'discard-again', draftId: second.draft.draftId, reason: 'user_request' },
+      ],
+    });
+
+    expect(discarded.summary.succeeded).toBe(2);
+    expect(discarded.results[0]).toMatchObject({
+      itemId: 'discard-ok',
+      ok: true,
+      result: { status: 'discarded' },
+    });
+    expect(discarded.results[1]).toMatchObject({
+      itemId: 'discard-again',
+      ok: true,
+      result: { status: 'already_discarded' },
+    });
+
+    store.close();
+  });
+
+  it('rejects deprecated custom card type definitions during staged creation', async () => {
+    const store = new DraftStore(dbPath);
+    const gateway = new MemoryGateway();
+    const catalog = new CatalogService(store);
+
+    catalog.upsertCustomCardTypeDefinition('default', {
+      cardTypeId: 'programming.v1.ts-debug',
+      label: 'TypeScript Debug',
+      modelName: 'ts.v1.debug',
+      defaultDeck: 'Programming::TypeScript::Debug',
+      source: 'custom',
+      requiredFields: ['BuggyCode', 'Fix'],
+      optionalFields: [],
+      renderIntent: 'production',
+      allowedHtmlPolicy: 'safe_inline_html',
+      fields: [
+        { name: 'BuggyCode', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html' },
+        { name: 'Fix', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html' },
+      ],
+    });
+    catalog.deprecateCardTypeDefinition('default', 'programming.v1.ts-debug');
+
+    const customService = new DraftService(store, catalog, gateway, {
+      activeProfileId: 'default',
+      stagedMarkerTag: '__mcp_staged',
+    });
+
+    await expect(
+      customService.createStagedCard({
+        profileId: 'default',
+        clientRequestId: 'req-deprecated-1',
+        cardTypeId: 'programming.v1.ts-debug',
+        fields: { BuggyCode: 'x', Fix: 'y' },
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
 
     store.close();
   });

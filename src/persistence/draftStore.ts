@@ -1,7 +1,15 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { CardTypeDefinition, CustomCardTypeDefinition, DraftListItem, DraftRecord, DraftState } from '../contracts/types.js';
+import { AppError } from '../contracts/errors.js';
+import type {
+  CardTypeDefinition,
+  CardTypeDefinitionStatus,
+  CustomCardTypeDefinition,
+  DraftListItem,
+  DraftRecord,
+  DraftState,
+} from '../contracts/types.js';
 
 export type DraftRow = {
   profile_id: string;
@@ -30,7 +38,9 @@ type CardTypeDefinitionRow = {
   profile_id: string;
   card_type_id: string;
   definition_json: string;
+  status: CardTypeDefinitionStatus;
   updated_at: string;
+  deprecated_at: string | null;
 };
 
 export class DraftStore {
@@ -251,12 +261,14 @@ export class DraftStore {
       .prepare(
         `
         INSERT INTO card_type_definitions (
-          profile_id, card_type_id, definition_json, updated_at
-        ) VALUES (?, ?, ?, ?)
+          profile_id, card_type_id, definition_json, status, updated_at, deprecated_at
+        ) VALUES (?, ?, ?, 'active', ?, NULL)
         ON CONFLICT(profile_id, card_type_id)
         DO UPDATE SET
           definition_json = excluded.definition_json,
-          updated_at = excluded.updated_at
+          status = 'active',
+          updated_at = excluded.updated_at,
+          deprecated_at = NULL
       `,
       )
       .run(profileId, definition.cardTypeId, JSON.stringify(definition), updatedAt);
@@ -268,16 +280,38 @@ export class DraftStore {
     return mapRowToCustomCardTypeDefinition(row);
   }
 
-  getCardTypeDefinition(profileId: string, cardTypeId: string): CustomCardTypeDefinition | undefined {
+  deprecateCardTypeDefinition(profileId: string, cardTypeId: string, deprecatedAt: string): CustomCardTypeDefinition {
+    const result = this.db
+      .prepare(
+        `
+        UPDATE card_type_definitions
+        SET status = 'deprecated', deprecated_at = ?, updated_at = ?
+        WHERE profile_id = ? AND card_type_id = ?
+      `,
+      )
+      .run(deprecatedAt, deprecatedAt, profileId, cardTypeId);
+    if (Number(result.changes ?? 0) === 0) {
+      throw new AppError('NOT_FOUND', `Custom cardTypeId not found: ${cardTypeId}`);
+    }
+    return this.getCardTypeDefinition(profileId, cardTypeId, { includeDeprecated: true }) as CustomCardTypeDefinition;
+  }
+
+  getCardTypeDefinition(
+    profileId: string,
+    cardTypeId: string,
+    options?: { includeDeprecated?: boolean },
+  ): CustomCardTypeDefinition | undefined {
+    const where = options?.includeDeprecated ? '' : ` AND status = 'active'`;
     const row = this.db
-      .prepare(`SELECT * FROM card_type_definitions WHERE profile_id = ? AND card_type_id = ?`)
+      .prepare(`SELECT * FROM card_type_definitions WHERE profile_id = ? AND card_type_id = ?${where}`)
       .get(profileId, cardTypeId) as CardTypeDefinitionRow | undefined;
     return row ? mapRowToCustomCardTypeDefinition(row) : undefined;
   }
 
-  listCardTypeDefinitions(profileId: string): CustomCardTypeDefinition[] {
+  listCardTypeDefinitions(profileId: string, options?: { includeDeprecated?: boolean }): CustomCardTypeDefinition[] {
+    const where = options?.includeDeprecated ? '' : ` AND status = 'active'`;
     const rows = this.db
-      .prepare(`SELECT * FROM card_type_definitions WHERE profile_id = ? ORDER BY card_type_id ASC`)
+      .prepare(`SELECT * FROM card_type_definitions WHERE profile_id = ?${where} ORDER BY card_type_id ASC`)
       .all(profileId) as CardTypeDefinitionRow[];
     return rows.map((row) => mapRowToCustomCardTypeDefinition(row));
   }
@@ -319,10 +353,31 @@ export class DraftStore {
         profile_id TEXT NOT NULL,
         card_type_id TEXT NOT NULL,
         definition_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
         updated_at TEXT NOT NULL,
+        deprecated_at TEXT,
         PRIMARY KEY (profile_id, card_type_id)
       );
     `);
+
+    this.ensureCardTypeDefinitionColumns();
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_card_type_definitions_profile_status
+        ON card_type_definitions(profile_id, status, card_type_id);
+    `);
+  }
+
+  private ensureCardTypeDefinitionColumns(): void {
+    const rows = this.db.prepare(`PRAGMA table_info(card_type_definitions)`).all() as Array<{ name: string }>;
+    const columnNames = new Set(rows.map((row) => row.name));
+
+    if (!columnNames.has('status')) {
+      this.db.exec(`ALTER TABLE card_type_definitions ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+    }
+
+    if (!columnNames.has('deprecated_at')) {
+      this.db.exec(`ALTER TABLE card_type_definitions ADD COLUMN deprecated_at TEXT`);
+    }
   }
 }
 
@@ -374,6 +429,8 @@ function mapRowToCustomCardTypeDefinition(row: CardTypeDefinitionRow): CustomCar
     ...definition,
     source: 'custom',
     profileId: row.profile_id,
+    status: row.status ?? 'active',
     updatedAt: row.updated_at,
+    deprecatedAt: row.deprecated_at ?? undefined,
   };
 }
