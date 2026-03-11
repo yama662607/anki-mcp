@@ -83,6 +83,31 @@ describe('AnkiConnectGateway', () => {
     ]);
   });
 
+  it('closes note dialog when extension close action is available', async () => {
+    const calls: FetchCall[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string; params: Record<string, unknown> };
+        calls.push({ action: body.action, params: body.params });
+
+        if (body.action === 'apiReflect') return ok({ actions: ['guiCloseNoteDialog'] });
+        if (body.action === 'guiCloseNoteDialog') return ok(true);
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    await expect(gateway.closeNoteDialog(777)).resolves.toBe(true);
+    await expect(gateway.closeNoteDialog(778)).resolves.toBe(true);
+
+    expect(calls.map((c) => c.action)).toEqual([
+      'apiReflect',
+      'guiCloseNoteDialog',
+      'guiCloseNoteDialog',
+    ]);
+  });
+
   it('falls back to guiEditNote when extension action is unavailable', async () => {
     const calls: FetchCall[] = [];
     vi.stubGlobal(

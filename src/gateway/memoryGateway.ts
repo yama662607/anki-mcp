@@ -103,6 +103,11 @@ export class MemoryGateway implements AnkiGateway {
     };
   }
 
+  async closeNoteDialog(noteId: number): Promise<boolean> {
+    this.requireNote(noteId);
+    return true;
+  }
+
   async listNoteTypes(): Promise<NoteTypeSummaryResult[]> {
     return [...this.models.values()]
       .map((model) => ({

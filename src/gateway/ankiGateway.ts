@@ -83,6 +83,7 @@ export interface AnkiGateway {
   createNote(input: CreateNoteInput): Promise<CreateNoteResult>;
   getNoteSnapshot(noteId: number): Promise<NoteSnapshot>;
   openBrowserForNote(noteId: number): Promise<PreviewResult>;
+  closeNoteDialog(noteId: number): Promise<boolean>;
   listNoteTypes(): Promise<NoteTypeSummaryResult[]>;
   getNoteTypeSchema(modelName: string): Promise<NoteTypeSchemaResult>;
   upsertNoteType(input: UpsertNoteTypeInput): Promise<NoteTypeSchemaResult>;

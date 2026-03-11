@@ -378,6 +378,7 @@ export class DraftService {
       throw new AppError('INVALID_STATE_TRANSITION', 'Committed draft cannot be discarded');
     }
 
+    await this.ankiGateway.closeNoteDialog(draft.noteId);
     await this.ankiGateway.deleteNote(draft.noteId);
 
     const discardedAt = new Date().toISOString();

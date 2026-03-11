@@ -19,6 +19,7 @@ type AnkiResponse<T> = {
 
 export class AnkiConnectGateway implements AnkiGateway {
   private guiPreviewNoteSupported: boolean | undefined;
+  private guiCloseNoteDialogSupported: boolean | undefined;
 
   constructor(private readonly endpoint = process.env.ANKI_CONNECT_URL ?? 'http://127.0.0.1:8765') {}
 
@@ -91,6 +92,14 @@ export class AnkiConnectGateway implements AnkiGateway {
       browserQuery: query,
       selectedCardIds,
     };
+  }
+
+  async closeNoteDialog(noteId: number): Promise<boolean> {
+    if (!(await this.supportsGuiCloseNoteDialog())) {
+      return false;
+    }
+
+    return this.call<boolean>('guiCloseNoteDialog', { note: noteId });
   }
 
   async listNoteTypes(): Promise<NoteTypeSummaryResult[]> {
@@ -241,6 +250,25 @@ export class AnkiConnectGateway implements AnkiGateway {
     }
 
     return this.guiPreviewNoteSupported;
+  }
+
+  private async supportsGuiCloseNoteDialog(): Promise<boolean> {
+    if (this.guiCloseNoteDialogSupported !== undefined) {
+      return this.guiCloseNoteDialogSupported;
+    }
+
+    try {
+      const reflected = await this.call<{ actions?: string[] }>('apiReflect', {
+        scopes: ['actions'],
+        actions: ['guiCloseNoteDialog'],
+      });
+      this.guiCloseNoteDialogSupported = Array.isArray(reflected.actions)
+        && reflected.actions.includes('guiCloseNoteDialog');
+    } catch {
+      this.guiCloseNoteDialogSupported = false;
+    }
+
+    return this.guiCloseNoteDialogSupported;
   }
 
   private async getFirstNoteInfo(noteId: number): Promise<Record<string, any>> {

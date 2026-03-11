@@ -2,6 +2,13 @@
 
 This project now includes a semi-automated E2E script for real Anki.
 
+## Safety Rules
+
+- Do not force-kill Anki while a collection is open. Use Anki's normal quit flow or restart it manually from the GUI.
+- Do not open `collection.anki2` with `sqlite3` while Anki is running. Treat the live collection as Anki-owned.
+- If AnkiConnect says `collection is not available`, stop the automation and wait for the profile to finish loading instead of retrying restarts.
+- If you need to verify database state, use Anki's own `Tools -> Check Database` flow after the UI is idle.
+
 ## Preconditions
 
 - Anki is running

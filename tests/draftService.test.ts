@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CatalogService } from '../src/services/catalogService.js';
@@ -315,6 +315,35 @@ describe('DraftService', () => {
         draftId: committed.draft.draftId,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_STATE_TRANSITION' });
+
+    store.close();
+  });
+
+  it('closes open note dialogs before deleting a discarded draft', async () => {
+    const { service, store, gateway } = createService();
+    const draft = await service.createDraft({
+      profileId: 'default',
+      clientRequestId: 'req-10b',
+      cardTypeId: 'language.v1.basic-bilingual',
+      fields: { Front: 'x', Back: 'y' },
+    });
+
+    const closeSpy = vi.spyOn(gateway, 'closeNoteDialog');
+    const deleteSpy = vi.spyOn(gateway, 'deleteNote');
+
+    await service.discardDraft({
+      profileId: 'default',
+      draftId: draft.draft.draftId,
+      reason: 'user_request',
+    });
+
+    expect(closeSpy).toHaveBeenCalledWith(draft.draft.noteId);
+    expect(deleteSpy).toHaveBeenCalledWith(draft.draft.noteId);
+    const closeOrder = closeSpy.mock.invocationCallOrder[0];
+    const deleteOrder = deleteSpy.mock.invocationCallOrder[0];
+    expect(closeOrder).toBeDefined();
+    expect(deleteOrder).toBeDefined();
+    expect(closeOrder!).toBeLessThan(deleteOrder!);
 
     store.close();
   });
