@@ -85,6 +85,6 @@ The operating model MUST document prohibited or discouraged usage patterns that 
 - **WHEN** a workflow attempts to encode card appearance by deck configuration alone
 - **THEN** the guidance flags the approach as invalid and redirects to note type management
 
-#### Scenario: Direct write without staging warning
+#### Scenario: Direct write without draft warning
 - **WHEN** an automation requests immediate persistent write for review-sensitive content
 - **THEN** the guidance marks it as high risk and recommends draft confirmation flow

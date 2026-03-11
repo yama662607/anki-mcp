@@ -10,7 +10,7 @@ import { CatalogService } from './catalogService.js';
 
 type DraftServiceConfig = {
   activeProfileId?: string;
-  stagedMarkerTag: string;
+  draftMarkerTag: string;
 };
 
 export class DraftService {
@@ -21,7 +21,7 @@ export class DraftService {
     private readonly config: DraftServiceConfig,
   ) {}
 
-  async createStagedCard(input: {
+  async createDraft(input: {
     profileId: string;
     clientRequestId: string;
     cardTypeId: string;
@@ -99,7 +99,7 @@ export class DraftService {
       });
     }
 
-    const mergedTags = normalizeTags([...validation.normalized.tags, this.config.stagedMarkerTag]);
+    const mergedTags = normalizeTags([...validation.normalized.tags, this.config.draftMarkerTag]);
 
     const created = await this.ankiGateway.createNote({
       deckName: validation.normalized.deckName,
@@ -108,18 +108,18 @@ export class DraftService {
       tags: mergedTags,
     });
 
-    await this.ankiGateway.applyStagedIsolation(created.noteId, created.cardIds, this.config.stagedMarkerTag);
-    const stagedSnapshot = await this.ankiGateway.getNoteSnapshot(created.noteId);
+    await this.ankiGateway.applyDraftIsolation(created.noteId, created.cardIds, this.config.draftMarkerTag);
+    const draftSnapshot = await this.ankiGateway.getNoteSnapshot(created.noteId);
 
     const draftId = randomUUID();
     const timestamp = new Date().toISOString();
     const fingerprint = this.computeLiveFingerprint({
-      modelName: stagedSnapshot.modelName,
-      fields: stagedSnapshot.fields,
-      tags: stagedSnapshot.tags,
+      modelName: draftSnapshot.modelName,
+      fields: draftSnapshot.fields,
+      tags: draftSnapshot.tags,
       profileId,
-      noteId: stagedSnapshot.noteId,
-      modTimestamp: stagedSnapshot.modTimestamp,
+      noteId: draftSnapshot.noteId,
+      modTimestamp: draftSnapshot.modTimestamp,
     });
 
     const draft: DraftRecord = {
@@ -135,9 +135,9 @@ export class DraftService {
       fields: validation.normalized.fields,
       tags: mergedTags,
       deckName: validation.normalized.deckName,
-      modTimestamp: stagedSnapshot.modTimestamp,
+      modTimestamp: draftSnapshot.modTimestamp,
       clientRequestId: input.clientRequestId,
-      draftMarkerTag: this.config.stagedMarkerTag,
+      draftMarkerTag: this.config.draftMarkerTag,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
@@ -157,7 +157,7 @@ export class DraftService {
     };
   }
 
-  async openStagedCardPreview(input: {
+  async openDraftPreview(input: {
     draftId: string;
     profileId?: string;
   }): Promise<{
@@ -198,7 +198,7 @@ export class DraftService {
     };
   }
 
-  async getStagedCard(input: {
+  async getDraft(input: {
     draftId: string;
     profileId?: string;
   }): Promise<{
@@ -223,7 +223,7 @@ export class DraftService {
     };
   }
 
-  async commitStagedCard(input: {
+  async commitDraft(input: {
     profileId: string;
     draftId: string;
     reviewDecision: ReviewDecision;
@@ -301,7 +301,7 @@ export class DraftService {
       });
     }
 
-    await this.ankiGateway.releaseStagedIsolation(draft.noteId, draft.cardIds, draft.draftMarkerTag);
+    await this.ankiGateway.releaseDraftIsolation(draft.noteId, draft.cardIds, draft.draftMarkerTag);
 
     const committedAt = new Date().toISOString();
     this.store.updateDraftState({
@@ -331,7 +331,7 @@ export class DraftService {
     };
   }
 
-  async discardStagedCard(input: {
+  async discardDraft(input: {
     profileId: string;
     draftId: string;
     reason?: 'user_request' | 'cleanup' | 'superseded' | 'conflict_recovery';
@@ -408,7 +408,7 @@ export class DraftService {
     };
   }
 
-  listStagedCards(input: {
+  listDrafts(input: {
     profileId?: string;
     states?: DraftState[];
     limit?: number;
@@ -449,7 +449,7 @@ export class DraftService {
     };
   }
 
-  async cleanupStagedCards(input: {
+  async cleanupDrafts(input: {
     profileId: string;
     olderThanHours?: number;
     states?: Array<'draft' | 'superseded'>;
@@ -474,7 +474,7 @@ export class DraftService {
 
     const deletedDraftIds: string[] = [];
     for (const candidate of candidates) {
-      await this.discardStagedCard({ profileId, draftId: candidate.draftId, reason: 'cleanup' });
+      await this.discardDraft({ profileId, draftId: candidate.draftId, reason: 'cleanup' });
       deletedDraftIds.push(candidate.draftId);
     }
 
@@ -497,7 +497,7 @@ export class DraftService {
     };
   }
 
-  async createStagedCardsBatch(input: {
+  async createDraftsBatch(input: {
     profileId: string;
     items: Array<{
       itemId: string;
@@ -530,7 +530,7 @@ export class DraftService {
 
     for (const item of input.items) {
       try {
-        const created = await this.createStagedCard({
+        const created = await this.createDraft({
           profileId,
           clientRequestId: item.clientRequestId,
           cardTypeId: item.cardTypeId,
@@ -553,7 +553,7 @@ export class DraftService {
     };
   }
 
-  async commitStagedCardsBatch(input: {
+  async commitDraftsBatch(input: {
     profileId: string;
     items: Array<{
       itemId: string;
@@ -602,7 +602,7 @@ export class DraftService {
 
     for (const item of input.items) {
       try {
-        const committed = await this.commitStagedCard({
+        const committed = await this.commitDraft({
           profileId,
           draftId: item.draftId,
           reviewDecision: item.reviewDecision,
@@ -621,7 +621,7 @@ export class DraftService {
     };
   }
 
-  async discardStagedCardsBatch(input: {
+  async discardDraftsBatch(input: {
     profileId: string;
     items: Array<{
       itemId: string;
@@ -668,7 +668,7 @@ export class DraftService {
 
     for (const item of input.items) {
       try {
-        const discarded = await this.discardStagedCard({
+        const discarded = await this.discardDraft({
           profileId,
           draftId: item.draftId,
           reason: item.reason,

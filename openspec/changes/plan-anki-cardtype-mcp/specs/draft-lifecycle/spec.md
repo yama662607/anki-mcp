@@ -7,7 +7,7 @@ The MCP server MUST implement card creation as a two-phase workflow (`draft` the
 - **WHEN** the client calls `create_draft` with valid card type and fields
 - **THEN** the server creates a draft note tagged as draft and returns a `draftId` with linked `noteId` and `cardIds`
 
-#### Scenario: Staged card metadata is persisted
+#### Scenario: Draft metadata is persisted
 - **WHEN** a draft is created
 - **THEN** the server records enough metadata to recover the draft by `draftId` across MCP session restarts
 
@@ -15,7 +15,7 @@ The MCP server MUST implement card creation as a two-phase workflow (`draft` the
 - **WHEN** a draft is created under an active Anki profile
 - **THEN** the server stores and resolves the draft with a `profileId` scope and prevents cross-profile draft lookup
 
-#### Scenario: Staged cards are isolated from learning queue
+#### Scenario: Drafts are isolated from learning queue
 - **WHEN** `create_draft` creates a draft
 - **THEN** the server applies draft-only markers and excludes generated cards from normal study flow until commit
 
@@ -136,7 +136,7 @@ The MCP server MUST support iterative rebuilds so users can preview, comment, an
 - **WHEN** a new draft supersedes an existing draft
 - **THEN** the server records lineage metadata (`supersedesDraftId`, chain depth, createdAt) for audit and recovery
 
-### Requirement: Staged Draft Maintenance
+### Requirement: Draft Maintenance
 The MCP server MUST provide operational tools to inspect and clean stale drafts.
 
 #### Scenario: List current drafts

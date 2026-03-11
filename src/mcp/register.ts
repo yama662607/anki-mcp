@@ -274,7 +274,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(createDraftInputSchema, input);
-        const payload = await services.draftService.createStagedCard(args);
+        const payload = await services.draftService.createDraft(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);
@@ -293,7 +293,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(createDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.createStagedCardsBatch(args));
+        return successResult(await services.draftService.createDraftsBatch(args));
       } catch (error) {
         return errorResult(error);
       }
@@ -311,7 +311,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(getDraftInputSchema, input);
-        return successResult(await services.draftService.getStagedCard(args));
+        return successResult(await services.draftService.getDraft(args));
       } catch (error) {
         return errorResult(error);
       }
@@ -329,7 +329,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(openDraftPreviewInputSchema, input);
-        const payload = await services.draftService.openStagedCardPreview(args);
+        const payload = await services.draftService.openDraftPreview(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);
@@ -348,7 +348,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(commitDraftInputSchema, input);
-        const payload = await services.draftService.commitStagedCard(args);
+        const payload = await services.draftService.commitDraft(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);
@@ -367,7 +367,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(commitDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.commitStagedCardsBatch(args));
+        return successResult(await services.draftService.commitDraftsBatch(args));
       } catch (error) {
         return errorResult(error);
       }
@@ -385,7 +385,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(discardDraftInputSchema, input);
-        const payload = await services.draftService.discardStagedCard(args);
+        const payload = await services.draftService.discardDraft(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);
@@ -404,7 +404,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(discardDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.discardStagedCardsBatch(args));
+        return successResult(await services.draftService.discardDraftsBatch(args));
       } catch (error) {
         return errorResult(error);
       }
@@ -422,7 +422,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(listDraftsInputSchema, input);
-        const payload = services.draftService.listStagedCards(args);
+        const payload = services.draftService.listDrafts(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);
@@ -441,7 +441,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     async (input) => {
       try {
         const args = parseOrThrow(cleanupDraftsInputSchema, input);
-        const payload = await services.draftService.cleanupStagedCards(args);
+        const payload = await services.draftService.cleanupDrafts(args);
         return successResult(payload);
       } catch (error) {
         return errorResult(error);

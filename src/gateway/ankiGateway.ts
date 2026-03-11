@@ -77,7 +77,7 @@ export interface AnkiGateway {
   listNoteTypes(): Promise<NoteTypeSummaryResult[]>;
   getNoteTypeSchema(modelName: string): Promise<NoteTypeSchemaResult>;
   upsertNoteType(input: UpsertNoteTypeInput): Promise<NoteTypeSchemaResult>;
-  applyStagedIsolation(noteId: number, cardIds: number[], stagedTag: string): Promise<void>;
-  releaseStagedIsolation(noteId: number, cardIds: number[], stagedTag: string): Promise<void>;
+  applyDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
+  releaseDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
   deleteNote(noteId: number): Promise<void>;
 }

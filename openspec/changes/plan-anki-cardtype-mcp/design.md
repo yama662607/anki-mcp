@@ -339,7 +339,7 @@
 5. Phase 4: 契約テスト・統合テスト・回帰テストをCIに組み込み
 
 ロールバック方針:
-- 初期実装はstaging-onlyモードで導入し、`commit` を機能フラグで段階解放する
+- 初期実装はdraft-onlyモードで導入し、`commit` を機能フラグで段階解放する
 - 不具合時は `commit` を停止して `discard` のみ許可する
 
 ## Open Questions

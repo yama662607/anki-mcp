@@ -25,7 +25,7 @@ Catalog tools MUST resolve definitions from merged sources: custom registry and 
 - **THEN** the server rejects the upsert with `CONFLICT`
 - **AND** does not shadow builtin behavior silently
 
-### Requirement: Staged Creation Compatibility With Custom Types
+### Requirement: Draft Creation Compatibility With Custom Types
 Existing draft-card lifecycle MUST work with custom card type definitions.
 
 #### Scenario: Create draft from custom type

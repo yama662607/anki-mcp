@@ -193,17 +193,17 @@ export class AnkiConnectGateway implements AnkiGateway {
     return this.getNoteTypeSchema(input.modelName);
   }
 
-  async applyStagedIsolation(_noteId: number, cardIds: number[], _stagedTag: string): Promise<void> {
+  async applyDraftIsolation(_noteId: number, cardIds: number[], _draftTag: string): Promise<void> {
     if (cardIds.length > 0) {
       await this.call<boolean>('suspend', { cards: cardIds });
     }
   }
 
-  async releaseStagedIsolation(noteId: number, cardIds: number[], stagedTag: string): Promise<void> {
+  async releaseDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void> {
     if (cardIds.length > 0) {
       await this.call<boolean>('unsuspend', { cards: cardIds });
     }
-    await this.call<unknown>('removeTags', { notes: [noteId], tags: stagedTag });
+    await this.call<unknown>('removeTags', { notes: [noteId], tags: draftTag });
   }
 
   async deleteNote(noteId: number): Promise<void> {

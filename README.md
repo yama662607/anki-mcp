@@ -1,6 +1,6 @@
 # anki-mcps
 
-TypeScript MCP server for staged, review-first Anki card creation.
+TypeScript MCP server for draft-first, review-first Anki card creation.
 
 ## Features
 
@@ -8,7 +8,7 @@ TypeScript MCP server for staged, review-first Anki card creation.
 - note type discovery and additive-safe authoring (`dryRun` default)
 - custom card type registry merged with builtin catalog
 - strict field validation and HTML policy sanitization
-- staged lifecycle (`create -> preview -> commit/discard`)
+- draft lifecycle (`create -> preview -> commit/discard`)
 - deterministic conflict detection via fingerprints
 - SQLite draft persistence with profile scoping
 - frozen v1 contract resource (`anki://contracts/v1/tools`)
@@ -27,7 +27,7 @@ npm run dev
 - `ANKI_CONNECT_URL` (default `http://127.0.0.1:8765`)
 - `ANKI_ACTIVE_PROFILE` (optional fallback for read tools)
 - `DRAFT_DB_PATH` (default `.data/drafts.sqlite`)
-- `STAGED_MARKER_TAG` (default `__mcp_staged`)
+- `DRAFT_MARKER_TAG` (default `__mcp_draft`)
 - `ANKI_GATEWAY_MODE=memory` for local deterministic testing without Anki
 
 ## Notes
@@ -35,7 +35,7 @@ npm run dev
 - write tools require explicit `profileId`
 - note type authoring flow:
   - `list_note_types -> get_note_type_schema -> upsert_note_type(dryRun=true) -> upsert_note_type(dryRun=false) -> upsert_card_type_definition`
-- staged cards are suspended until committed
+- draft cards are suspended until committed
 - preview integration:
   - preferred: `guiPreviewNote` (from optional `anki-connect-extension` add-on)
   - fallback: `guiBrowse -> guiSelectCard -> guiEditNote`

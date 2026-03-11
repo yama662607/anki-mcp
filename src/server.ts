@@ -21,7 +21,7 @@ export function createRuntime(): AppRuntime {
   mkdirSync(dataDir, { recursive: true });
 
   const dbPath = process.env.DRAFT_DB_PATH ?? resolve(dataDir, 'drafts.sqlite');
-  const stagedMarkerTag = process.env.STAGED_MARKER_TAG ?? '__mcp_staged';
+  const draftMarkerTag = process.env.DRAFT_MARKER_TAG ?? '__mcp_draft';
 
   const gatewayMode = process.env.ANKI_GATEWAY_MODE ?? 'anki-connect';
   const gateway = gatewayMode === 'memory' ? new MemoryGateway() : new AnkiConnectGateway();
@@ -30,7 +30,7 @@ export function createRuntime(): AppRuntime {
   const catalogService = new CatalogService(store);
   const draftService = new DraftService(store, catalogService, gateway, {
     activeProfileId,
-    stagedMarkerTag,
+    draftMarkerTag,
   });
   const noteTypeService = new NoteTypeService(gateway, { activeProfileId });
 

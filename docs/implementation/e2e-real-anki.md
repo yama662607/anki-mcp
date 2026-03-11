@@ -56,6 +56,6 @@ ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch ANKI_E2E_SCENARIO=finaliz
 
 ## Why this is semi-automated
 
-- the script automates setup, staging, and finalization
+- the script automates setup, draft, and finalization
 - visual inspection of the Anki preview remains manual
 - final approval is explicit through the second command

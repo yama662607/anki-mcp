@@ -22,7 +22,7 @@ function createService() {
   const gateway = new MemoryGateway();
   const service = new DraftService(store, new CatalogService(store), gateway, {
     activeProfileId: 'default',
-    stagedMarkerTag: '__mcp_staged',
+    draftMarkerTag: '__mcp_draft',
   });
   return { service, store, gateway };
 }
@@ -31,14 +31,14 @@ describe('DraftService', () => {
   it('creates draft and reuses same draft for idempotent retries', async () => {
     const { service, store } = createService();
 
-    const first = await service.createStagedCard({
+    const first = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-1',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'hello', Back: 'こんにちは' },
     });
 
-    const second = await service.createStagedCard({
+    const second = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-1',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -54,7 +54,7 @@ describe('DraftService', () => {
   it('rejects idempotency key reuse with changed payload', async () => {
     const { service, store } = createService();
 
-    await service.createStagedCard({
+    await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-2',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -62,7 +62,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.createStagedCard({
+      service.createDraft({
         profileId: 'default',
         clientRequestId: 'req-2',
         cardTypeId: 'language.v1.basic-bilingual',
@@ -75,14 +75,14 @@ describe('DraftService', () => {
 
   it('commits a draft and is idempotent on second commit', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-3',
       cardTypeId: 'programming.v1.concept-qa',
       fields: { Front: 'What is idempotency?', Back: 'Safe retry behavior' },
     });
 
-    const firstCommit = await service.commitStagedCard({
+    const firstCommit = await service.commitDraft({
       profileId: 'default',
       draftId: draft.draft.draftId,
       reviewDecision: {
@@ -94,7 +94,7 @@ describe('DraftService', () => {
       },
     });
 
-    const secondCommit = await service.commitStagedCard({
+    const secondCommit = await service.commitDraft({
       profileId: 'default',
       draftId: draft.draft.draftId,
       reviewDecision: {
@@ -113,7 +113,7 @@ describe('DraftService', () => {
 
   it('detects conflict when note changes before commit', async () => {
     const { service, store, gateway } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-4',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -125,7 +125,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.commitStagedCard({
+      service.commitDraft({
         profileId: 'default',
         draftId: draft.draft.draftId,
         reviewDecision: {
@@ -143,7 +143,7 @@ describe('DraftService', () => {
 
   it('rejects missing checklist confirmation', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-5',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -152,7 +152,7 @@ describe('DraftService', () => {
 
     let error: unknown;
     try {
-      await service.commitStagedCard({
+      await service.commitDraft({
         profileId: 'default',
         draftId: draft.draft.draftId,
         reviewDecision: {
@@ -175,7 +175,7 @@ describe('DraftService', () => {
 
   it('returns PROFILE_SCOPE_MISMATCH when mutating other profile draft', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'profile-a',
       clientRequestId: 'req-6',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -183,7 +183,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.commitStagedCard({
+      service.commitDraft({
         profileId: 'profile-b',
         draftId: draft.draft.draftId,
         reviewDecision: {
@@ -201,14 +201,14 @@ describe('DraftService', () => {
 
   it('supersedes previous draft and blocks direct commit of superseded one', async () => {
     const { service, store } = createService();
-    const first = await service.createStagedCard({
+    const first = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-7a',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'first', Back: 'first' },
     });
 
-    const second = await service.createStagedCard({
+    const second = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-7b',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -217,7 +217,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.commitStagedCard({
+      service.commitDraft({
         profileId: 'default',
         draftId: first.draft.draftId,
         reviewDecision: {
@@ -230,7 +230,7 @@ describe('DraftService', () => {
       }),
     ).rejects.toMatchObject({ code: 'CONFLICT' });
 
-    const committed = await service.commitStagedCard({
+    const committed = await service.commitDraft({
       profileId: 'default',
       draftId: second.draft.draftId,
       reviewDecision: {
@@ -248,7 +248,7 @@ describe('DraftService', () => {
 
   it('cleans up stale drafts with default 72h threshold', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-8',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -262,7 +262,7 @@ describe('DraftService', () => {
       updatedAt: new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString(),
     });
 
-    const cleaned = await service.cleanupStagedCards({ profileId: 'default' });
+    const cleaned = await service.cleanupDrafts({ profileId: 'default' });
     expect(cleaned.olderThanHours).toBe(72);
     expect(cleaned.deletedDraftIds).toContain(draft.draft.draftId);
 
@@ -271,18 +271,18 @@ describe('DraftService', () => {
 
   it('returns already_discarded on second discard and rejects discarding committed drafts', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-9',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'x', Back: 'y' },
     });
 
-    const firstDiscard = await service.discardStagedCard({
+    const firstDiscard = await service.discardDraft({
       profileId: 'default',
       draftId: draft.draft.draftId,
     });
-    const secondDiscard = await service.discardStagedCard({
+    const secondDiscard = await service.discardDraft({
       profileId: 'default',
       draftId: draft.draft.draftId,
     });
@@ -290,14 +290,14 @@ describe('DraftService', () => {
     expect(firstDiscard.result.status).toBe('discarded');
     expect(secondDiscard.result.status).toBe('already_discarded');
 
-    const committed = await service.createStagedCard({
+    const committed = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-10',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'commit', Back: 'me' },
     });
 
-    await service.commitStagedCard({
+    await service.commitDraft({
       profileId: 'default',
       draftId: committed.draft.draftId,
       reviewDecision: {
@@ -310,7 +310,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.discardStagedCard({
+      service.discardDraft({
         profileId: 'default',
         draftId: committed.draft.draftId,
       }),
@@ -321,20 +321,20 @@ describe('DraftService', () => {
 
   it('rejects invalid supersede sources and profile-mismatched supersede chains', async () => {
     const { service, store } = createService();
-    const original = await service.createStagedCard({
+    const original = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-11a',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'first', Back: 'first' },
     });
 
-    await service.discardStagedCard({
+    await service.discardDraft({
       profileId: 'default',
       draftId: original.draft.draftId,
     });
 
     await expect(
-      service.createStagedCard({
+      service.createDraft({
         profileId: 'default',
         clientRequestId: 'req-11b',
         cardTypeId: 'language.v1.basic-bilingual',
@@ -343,7 +343,7 @@ describe('DraftService', () => {
       }),
     ).rejects.toMatchObject({ code: 'INVALID_SUPERSEDE_SOURCE' });
 
-    const foreign = await service.createStagedCard({
+    const foreign = await service.createDraft({
       profileId: 'profile-a',
       clientRequestId: 'req-11c',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -351,7 +351,7 @@ describe('DraftService', () => {
     });
 
     await expect(
-      service.createStagedCard({
+      service.createDraft({
         profileId: 'profile-b',
         clientRequestId: 'req-11d',
         cardTypeId: 'language.v1.basic-bilingual',
@@ -387,10 +387,10 @@ describe('DraftService', () => {
 
     const customService = new DraftService(store, catalog, gateway, {
       activeProfileId: 'default',
-      stagedMarkerTag: '__mcp_staged',
+      draftMarkerTag: '__mcp_draft',
     });
 
-    const draft = await customService.createStagedCard({
+    const draft = await customService.createDraft({
       profileId: 'default',
       clientRequestId: 'req-custom-1',
       cardTypeId: 'programming.v1.ts-concept',
@@ -410,7 +410,7 @@ describe('DraftService', () => {
 
   it('returns stored draft details and blocks cross-profile inspection', async () => {
     const { service, store } = createService();
-    const draft = await service.createStagedCard({
+    const draft = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-12',
       cardTypeId: 'language.v1.basic-bilingual',
@@ -418,7 +418,7 @@ describe('DraftService', () => {
       tags: ['lesson-1'],
     });
 
-    const detail = await service.getStagedCard({
+    const detail = await service.getDraft({
       profileId: 'default',
       draftId: draft.draft.draftId,
     });
@@ -428,7 +428,7 @@ describe('DraftService', () => {
     expect(detail.cardType.cardTypeId).toBe('language.v1.basic-bilingual');
 
     await expect(
-      service.getStagedCard({
+      service.getDraft({
         profileId: 'other-profile',
         draftId: draft.draft.draftId,
       }),
@@ -440,7 +440,7 @@ describe('DraftService', () => {
   it('creates drafts in batch with mixed outcomes', async () => {
     const { service, store } = createService();
 
-    const batch = await service.createStagedCardsBatch({
+    const batch = await service.createDraftsBatch({
       profileId: 'default',
       items: [
         {
@@ -472,20 +472,20 @@ describe('DraftService', () => {
 
   it('commits and discards drafts in batch with per-item semantics', async () => {
     const { service, store } = createService();
-    const first = await service.createStagedCard({
+    const first = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-batch-3',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'a', Back: 'b' },
     });
-    const second = await service.createStagedCard({
+    const second = await service.createDraft({
       profileId: 'default',
       clientRequestId: 'req-batch-4',
       cardTypeId: 'language.v1.basic-bilingual',
       fields: { Front: 'c', Back: 'd' },
     });
 
-    const committed = await service.commitStagedCardsBatch({
+    const committed = await service.commitDraftsBatch({
       profileId: 'default',
       items: [
         {
@@ -521,7 +521,7 @@ describe('DraftService', () => {
       error: { code: 'INVALID_ARGUMENT' },
     });
 
-    const discarded = await service.discardStagedCardsBatch({
+    const discarded = await service.discardDraftsBatch({
       profileId: 'default',
       items: [
         { itemId: 'discard-ok', draftId: second.draft.draftId, reason: 'user_request' },
@@ -568,11 +568,11 @@ describe('DraftService', () => {
 
     const customService = new DraftService(store, catalog, gateway, {
       activeProfileId: 'default',
-      stagedMarkerTag: '__mcp_staged',
+      draftMarkerTag: '__mcp_draft',
     });
 
     await expect(
-      customService.createStagedCard({
+      customService.createDraft({
         profileId: 'default',
         clientRequestId: 'req-deprecated-1',
         cardTypeId: 'programming.v1.ts-debug',

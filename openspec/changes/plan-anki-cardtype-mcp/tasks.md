@@ -3,13 +3,13 @@
 - [x] 1.1 Define `cardTypeId` naming and versioning rules
 - [x] 1.2 Finalize `list_card_types` response schema and examples
 - [x] 1.3 Finalize `get_card_type_schema` field metadata schema
-- [x] 1.4 Finalize `` error/warning schema
+- [x] 1.4 Finalize catalog validation error/warning schema
 - [x] 1.5 Define strict request schema behavior (`additionalProperties=false`) for catalog tools
 - [x] 1.6 Define minimum card-type metadata (`renderIntent`, `allowedHtmlPolicy`) and enum constraints
 - [x] 1.7 Freeze per-tool request/response schema set for all v1 tools
 - [x] 1.8 Define strict sanitizer allowlist for `safe_inline_html` and escaping rules for `plain_text_only`
 
-## 2. Staged Lifecycle Contract
+## 2. Draft Lifecycle Contract
 
 - [x] 2.1 Define draft state model (`draft/committed/discarded`) and transitions
 - [x] 2.2 Define `create_draft` input/output and idempotency behavior
@@ -67,7 +67,7 @@
 - [x] 7.1 Define responsibilities for `profile/deck/note type/note/card/tag`
 - [x] 7.2 Define standard naming and segregation rules for language/programming/fundamentals use cases
 - [x] 7.3 Define tool-to-classification mapping (which tool mutates which Anki object)
-- [x] 7.4 Define operational playbooks for staging, review confirmation, and correction/rebuild flows
+- [x] 7.4 Define operational playbooks for draft, review confirmation, and correction/rebuild flows
 - [x] 7.5 Define anti-patterns and guardrails (e.g., deck-based design assumptions)
 - [x] 7.6 Define deterministic profile resolution precedence and fail-closed behavior
 - [x] 7.7 Define profile-scope mismatch handling (`PROFILE_SCOPE_MISMATCH`) for cross-profile draft mutation attempts

@@ -27,7 +27,7 @@ export type DraftRow = {
   mod_timestamp: number;
   client_request_id: string;
   request_fingerprint: string;
-  staged_marker_tag: string;
+  draft_marker_tag: string;
   created_at: string;
   updated_at: string;
   committed_at: string | null;
@@ -63,7 +63,7 @@ export class DraftStore {
         INSERT INTO drafts (
           profile_id, draft_id, note_id, card_ids_json, state, card_type_id, fingerprint,
           supersedes_draft_id, chain_depth, fields_json, tags_json, deck_name, mod_timestamp,
-          client_request_id, request_fingerprint, staged_marker_tag,
+          client_request_id, request_fingerprint, draft_marker_tag,
           created_at, updated_at, committed_at, discarded_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
       `,
@@ -334,7 +334,7 @@ export class DraftStore {
         mod_timestamp INTEGER NOT NULL,
         client_request_id TEXT NOT NULL,
         request_fingerprint TEXT NOT NULL,
-        staged_marker_tag TEXT NOT NULL,
+        draft_marker_tag TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         committed_at TEXT,
@@ -360,6 +360,7 @@ export class DraftStore {
       );
     `);
 
+    this.ensureDraftColumns();
     this.db.exec(`UPDATE drafts SET state = 'draft' WHERE state = 'staged'`);
     this.ensureCardTypeDefinitionColumns();
     this.db.exec(`
@@ -380,6 +381,15 @@ export class DraftStore {
       this.db.exec(`ALTER TABLE card_type_definitions ADD COLUMN deprecated_at TEXT`);
     }
   }
+
+  private ensureDraftColumns(): void {
+    const rows = this.db.prepare(`PRAGMA table_info(drafts)`).all() as Array<{ name: string }>;
+    const columnNames = new Set(rows.map((row) => row.name));
+
+    if (columnNames.has('staged_marker_tag') && !columnNames.has('draft_marker_tag')) {
+      this.db.exec(`ALTER TABLE drafts RENAME COLUMN staged_marker_tag TO draft_marker_tag`);
+    }
+  }
 }
 
 function mapRowToDraft(row: DraftRow): DraftRecord {
@@ -398,7 +408,7 @@ function mapRowToDraft(row: DraftRow): DraftRecord {
     deckName: row.deck_name,
     modTimestamp: row.mod_timestamp,
     clientRequestId: row.client_request_id,
-    draftMarkerTag: row.staged_marker_tag,
+    draftMarkerTag: row.draft_marker_tag,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     committedAt: row.committed_at ?? undefined,

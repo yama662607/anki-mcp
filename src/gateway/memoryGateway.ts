@@ -138,16 +138,16 @@ export class MemoryGateway implements AnkiGateway {
     return this.materializeModel(existing);
   }
 
-  async applyStagedIsolation(noteId: number, _cardIds: number[], _stagedTag: string): Promise<void> {
+  async applyDraftIsolation(noteId: number, _cardIds: number[], _draftTag: string): Promise<void> {
     const note = this.requireNote(noteId);
     note.suspended = true;
     note.modTimestamp = Date.now();
   }
 
-  async releaseStagedIsolation(noteId: number, _cardIds: number[], stagedTag: string): Promise<void> {
+  async releaseDraftIsolation(noteId: number, _cardIds: number[], draftTag: string): Promise<void> {
     const note = this.requireNote(noteId);
     note.suspended = false;
-    note.tags = note.tags.filter((tag) => tag !== stagedTag);
+    note.tags = note.tags.filter((tag) => tag !== draftTag);
     note.modTimestamp = Date.now();
   }
 
