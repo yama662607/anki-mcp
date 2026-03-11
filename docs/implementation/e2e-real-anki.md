@@ -59,3 +59,26 @@ ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch ANKI_E2E_SCENARIO=finaliz
 - the script automates setup, draft, and finalization
 - visual inspection of the Anki preview remains manual
 - final approval is explicit through the second command
+
+## Domain pack smoke matrix
+
+The automated MCP test suite now covers these pack-level smoke flows with the in-memory gateway:
+
+- English listening:
+  - `apply_starter_pack(english-core)`
+  - `import_media_asset`
+  - `create_draft`
+  - `open_draft_preview`
+  - `discard_draft`
+- Programming:
+  - `apply_starter_pack(programming-core, languages=["typescript"])`
+  - `create_draft`
+  - `open_draft_preview`
+  - `discard_draft`
+- Fundamentals:
+  - `apply_starter_pack(fundamentals-core)`
+  - `create_draft`
+  - `open_draft_preview`
+  - `discard_draft`
+
+Use the real-Anki script when you want to confirm the same workflow against a live Anki profile after visual review.

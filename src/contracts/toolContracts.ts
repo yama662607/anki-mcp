@@ -199,6 +199,58 @@ export const TOOL_CONTRACTS_V1 = {
         isCloze: { type: 'boolean' },
       },
     },
+    StarterPackOptionDefinition: {
+      type: 'object',
+      required: ['name', 'type', 'required', 'description'],
+      additionalProperties: false,
+      properties: {
+        name: { type: 'string' },
+        type: { enum: ['string', 'string_array'] },
+        required: { type: 'boolean' },
+        description: { type: 'string' },
+        allowedValues: { type: 'array', items: { type: 'string' } },
+        defaultValue: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+          ],
+        },
+      },
+    },
+    StarterPackSummary: {
+      type: 'object',
+      required: ['packId', 'label', 'version', 'domains', 'supportedOptions'],
+      additionalProperties: false,
+      properties: {
+        packId: { type: 'string' },
+        label: { type: 'string' },
+        version: { type: 'string' },
+        domains: { type: 'array', items: { type: 'string' } },
+        supportedOptions: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackOptionDefinition' } },
+      },
+    },
+    StarterPackOperation: {
+      type: 'object',
+      required: ['kind', 'id', 'status'],
+      additionalProperties: false,
+      properties: {
+        kind: { enum: ['note_type', 'card_type_definition', 'deck_root'] },
+        id: { type: 'string' },
+        status: { enum: ['create', 'update', 'unchanged'] },
+      },
+    },
+    ImportedMediaAsset: {
+      type: 'object',
+      required: ['mediaKind', 'sha256', 'storedFilename', 'fieldValue', 'alreadyExisted'],
+      additionalProperties: false,
+      properties: {
+        mediaKind: { enum: ['audio', 'image'] },
+        sha256: { type: 'string' },
+        storedFilename: { type: 'string' },
+        fieldValue: { type: 'string' },
+        alreadyExisted: { type: 'boolean' },
+      },
+    },
   },
   tools: {
     list_card_types: {
@@ -233,6 +285,24 @@ export const TOOL_CONTRACTS_V1 = {
         properties: {
           ...baseResponse.properties,
           noteTypes: { type: 'array', items: { $ref: '#/sharedTypes/NoteTypeSummary' } },
+        },
+      },
+    },
+    list_starter_packs: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'packCatalogVersion', 'packs'],
+        properties: {
+          ...baseResponse.properties,
+          packCatalogVersion: { type: 'string' },
+          packs: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackSummary' } },
         },
       },
     },
@@ -280,6 +350,53 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
+    apply_starter_pack: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'packId'],
+        properties: {
+          profileId: { type: 'string' },
+          packId: { type: 'string' },
+          version: { type: 'string' },
+          dryRun: { type: 'boolean' },
+          options: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              deckRoot: { type: 'string' },
+              languages: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'pack', 'dryRun', 'result'],
+        properties: {
+          ...baseResponse.properties,
+          pack: { $ref: '#/sharedTypes/StarterPackSummary' },
+          dryRun: { type: 'boolean' },
+          result: {
+            type: 'object',
+            required: ['status', 'deckRoots', 'tagTemplates', 'operations'],
+            additionalProperties: false,
+            properties: {
+              status: { enum: ['planned', 'applied'] },
+              deckRoots: { type: 'array', items: { type: 'string' } },
+              tagTemplates: {
+                type: 'object',
+                additionalProperties: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+              operations: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackOperation' } },
+            },
+          },
+        },
+      },
+    },
     upsert_card_type_definition: {
       request: {
         type: 'object',
@@ -296,6 +413,27 @@ export const TOOL_CONTRACTS_V1 = {
         properties: {
           ...baseResponse.properties,
           cardType: { type: 'object' },
+        },
+      },
+    },
+    import_media_asset: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['profileId', 'localPath'],
+        properties: {
+          profileId: { type: 'string' },
+          localPath: { type: 'string' },
+          mediaKind: { enum: ['audio', 'image'] },
+          preferredFilename: { type: 'string' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'asset'],
+        properties: {
+          ...baseResponse.properties,
+          asset: { $ref: '#/sharedTypes/ImportedMediaAsset' },
         },
       },
     },

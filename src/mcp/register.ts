@@ -1,17 +1,20 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
+  applyStarterPackInputSchema,
   cleanupDraftsInputSchema,
   commitDraftsBatchInputSchema,
   commitDraftInputSchema,
   createDraftsBatchInputSchema,
   createDraftInputSchema,
   deprecateCardTypeDefinitionInputSchema,
+  importMediaAssetInputSchema,
   getCardTypeSchemaInputSchema,
   getNoteTypeSchemaInputSchema,
   getDraftInputSchema,
   listCardTypeDefinitionsInputSchema,
   listCardTypesInputSchema,
   listNoteTypesInputSchema,
+  listStarterPacksInputSchema,
   listDraftsInputSchema,
   openDraftPreviewInputSchema,
   upsertCardTypeDefinitionInputSchema,
@@ -21,7 +24,9 @@ import {
 } from '../contracts/schemas.js';
 import { CatalogService } from '../services/catalogService.js';
 import { DraftService } from '../services/draftService.js';
+import { MediaService } from '../services/mediaService.js';
 import { NoteTypeService } from '../services/noteTypeService.js';
+import { StarterPackService } from '../services/starterPackService.js';
 import { getContractsResourcePayload } from './contractsResource.js';
 import { errorResult, parseOrThrow, successResult } from './result.js';
 import { resolveProfileId } from '../utils/profile.js';
@@ -30,6 +35,8 @@ export function registerMcpHandlers(server: McpServer, services: {
   catalogService: CatalogService;
   draftService: DraftService;
   noteTypeService: NoteTypeService;
+  starterPackService: StarterPackService;
+  mediaService: MediaService;
 }) {
   server.registerResource(
     'tool_contracts_v1',
@@ -64,6 +71,25 @@ export function registerMcpHandlers(server: McpServer, services: {
           uri: uri.href,
           mimeType: 'application/json',
           text: JSON.stringify(services.draftService.getCatalogResourcePayload(), null, 2),
+        },
+      ],
+    }),
+  );
+
+  server.registerResource(
+    'starter_pack_catalog',
+    'anki://starter-packs/catalog',
+    {
+      title: 'Anki Starter Pack Catalog',
+      description: 'Versioned starter packs for English, programming, and fundamentals authoring.',
+      mimeType: 'application/json',
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(services.starterPackService.getCatalogResourcePayload(process.env.ANKI_ACTIVE_PROFILE), null, 2),
         },
       ],
     }),
@@ -200,6 +226,24 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
+    'list_starter_packs',
+    {
+      title: 'List Starter Packs',
+      description: 'List versioned starter packs that bootstrap note types and custom card type definitions.',
+      inputSchema: listStarterPacksInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(listStarterPacksInputSchema, input);
+        return successResult(await services.starterPackService.listStarterPacks(args));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'get_note_type_schema',
     {
       title: 'Get Note Type Schema',
@@ -236,6 +280,24 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
+    'apply_starter_pack',
+    {
+      title: 'Apply Starter Pack',
+      description: 'Dry-run by default. Provision note types and custom card type definitions for a supported learning pack.',
+      inputSchema: applyStarterPackInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(applyStarterPackInputSchema, input);
+        return successResult(await services.starterPackService.applyStarterPack(args));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
     'upsert_card_type_definition',
     {
       title: 'Upsert Card Type Definition',
@@ -257,6 +319,24 @@ export function registerMcpHandlers(server: McpServer, services: {
           cardType: services.catalogService.upsertCustomCardTypeDefinition(profileId, args.definition),
         };
         return successResult(payload);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'import_media_asset',
+    {
+      title: 'Import Media Asset',
+      description: 'Import a local audio or image file into Anki media and return an Anki-ready field value.',
+      inputSchema: importMediaAssetInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        const args = parseOrThrow(importMediaAssetInputSchema, input);
+        return successResult(await services.mediaService.importMediaAsset(args));
       } catch (error) {
         return errorResult(error);
       }

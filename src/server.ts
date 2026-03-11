@@ -7,7 +7,9 @@ import { MemoryGateway } from './gateway/memoryGateway.js';
 import { DraftStore } from './persistence/draftStore.js';
 import { CatalogService } from './services/catalogService.js';
 import { DraftService } from './services/draftService.js';
+import { MediaService } from './services/mediaService.js';
 import { NoteTypeService } from './services/noteTypeService.js';
+import { StarterPackService } from './services/starterPackService.js';
 import { registerMcpHandlers } from './mcp/register.js';
 
 export type AppRuntime = {
@@ -28,11 +30,13 @@ export function createRuntime(): AppRuntime {
 
   const store = new DraftStore(dbPath);
   const catalogService = new CatalogService(store);
+  const noteTypeService = new NoteTypeService(gateway, { activeProfileId });
+  const starterPackService = new StarterPackService(noteTypeService, catalogService, { activeProfileId });
+  const mediaService = new MediaService(gateway, { activeProfileId });
   const draftService = new DraftService(store, catalogService, gateway, {
     activeProfileId,
     draftMarkerTag,
   });
-  const noteTypeService = new NoteTypeService(gateway, { activeProfileId });
 
   const server = new McpServer(
     {
@@ -42,6 +46,8 @@ export function createRuntime(): AppRuntime {
     {
       instructions: [
         'Use this flow for card creation: list_card_types -> get_card_type_schema -> create_draft -> open_draft_preview -> commit_draft or discard_draft.',
+        'Use starter-pack bootstrap as: list_starter_packs -> apply_starter_pack(dryRun=true) -> apply_starter_pack(dryRun=false).',
+        'Use import_media_asset before listening cards so Audio fields receive an Anki-ready token.',
         'Use note-type authoring as: list_note_types -> get_note_type_schema -> upsert_note_type(dryRun=true) -> upsert_note_type(dryRun=false) -> upsert_card_type_definition.',
         'Use authoring management as: list_card_type_definitions -> deprecate_card_type_definition, and draft inspection as get_draft.',
         'For multiple notes, prefer create_drafts_batch and batch finalize tools with explicit per-item review decisions.',
@@ -51,7 +57,7 @@ export function createRuntime(): AppRuntime {
     },
   );
 
-  registerMcpHandlers(server, { catalogService, draftService, noteTypeService });
+  registerMcpHandlers(server, { catalogService, draftService, noteTypeService, starterPackService, mediaService });
 
   return { server, store };
 }

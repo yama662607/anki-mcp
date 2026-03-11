@@ -7,6 +7,8 @@ import type {
   NoteTypeSchemaResult,
   NoteTypeSummaryResult,
   PreviewResult,
+  StoreMediaFileInput,
+  StoreMediaFileResult,
   UpsertNoteTypeInput,
 } from './ankiGateway.js';
 
@@ -204,6 +206,19 @@ export class AnkiConnectGateway implements AnkiGateway {
       await this.call<boolean>('unsuspend', { cards: cardIds });
     }
     await this.call<unknown>('removeTags', { notes: [noteId], tags: draftTag });
+  }
+
+  async listMediaFiles(pattern: string): Promise<string[]> {
+    return this.call<string[]>('getMediaFilesNames', { pattern });
+  }
+
+  async storeMediaFile(input: StoreMediaFileInput): Promise<StoreMediaFileResult> {
+    const storedFilename = await this.call<string>('storeMediaFile', {
+      filename: input.filename,
+      path: input.path,
+      deleteExisting: false,
+    });
+    return { storedFilename };
   }
 
   async deleteNote(noteId: number): Promise<void> {

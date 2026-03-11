@@ -25,6 +25,9 @@
   - `create_drafts_batch`
   - `commit_drafts_batch`
   - `discard_drafts_batch`
+  - `list_starter_packs`
+  - `apply_starter_pack`
+  - `import_media_asset`
 
 ## 1.4 validation error/warning model
 
@@ -70,3 +73,5 @@ Each card type includes:
 - `list_card_types` returns active custom definitions only.
 - `list_card_type_definitions(includeDeprecated=true)` exposes deprecated definitions for audit and migration.
 - `create_draft` rejects deprecated custom `cardTypeId` values with `CONFLICT`.
+- starter packs are exposed via `anki://starter-packs/catalog`.
+- `apply_starter_pack` is the preferred way to bootstrap canonical domain note types and custom card type definitions.

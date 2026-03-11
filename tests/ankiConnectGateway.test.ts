@@ -260,4 +260,27 @@ describe('AnkiConnectGateway', () => {
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).code).toBe('DEPENDENCY_UNAVAILABLE');
   });
+
+  it('stores media files and lists media names through AnkiConnect actions', async () => {
+    const calls: FetchCall[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string; params: Record<string, unknown> };
+        calls.push({ action: body.action, params: body.params });
+
+        if (body.action === 'getMediaFilesNames') return ok(['mcp-audio-deadbeef.mp3']);
+        if (body.action === 'storeMediaFile') return ok('mcp-audio-deadbeef.mp3');
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    const names = await gateway.listMediaFiles('mcp-*');
+    const stored = await gateway.storeMediaFile({ filename: 'mcp-audio-deadbeef.mp3', path: '/tmp/test.mp3' });
+
+    expect(names).toEqual(['mcp-audio-deadbeef.mp3']);
+    expect(stored.storedFilename).toBe('mcp-audio-deadbeef.mp3');
+    expect(calls.map((call) => call.action)).toEqual(['getMediaFilesNames', 'storeMediaFile']);
+  });
 });

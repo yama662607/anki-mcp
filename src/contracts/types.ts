@@ -137,3 +137,49 @@ export type BatchResultSummary = {
   succeeded: number;
   failed: number;
 };
+
+export type StarterPackOptionDefinition = {
+  name: string;
+  type: 'string' | 'string_array';
+  required: boolean;
+  description: string;
+  allowedValues?: string[];
+  defaultValue?: string | string[];
+};
+
+export type StarterPackSummary = {
+  packId: string;
+  label: string;
+  version: string;
+  domains: string[];
+  supportedOptions: StarterPackOptionDefinition[];
+};
+
+export type StarterPackOperation = {
+  kind: 'note_type' | 'card_type_definition' | 'deck_root';
+  id: string;
+  status: 'create' | 'update' | 'unchanged';
+};
+
+export type StarterPackManifest = StarterPackSummary & {
+  deckRoots: string[];
+  tagTemplates: Record<string, string[]>;
+  noteTypes: Array<{
+    modelName: string;
+    fields: NoteTypeField[];
+    templates: NoteTypeTemplate[];
+    css?: string;
+    isCloze?: boolean;
+  }>;
+  cardTypes: CardTypeDefinition[];
+};
+
+export type MediaKind = 'audio' | 'image';
+
+export type ImportedMediaAsset = {
+  mediaKind: MediaKind;
+  sha256: string;
+  storedFilename: string;
+  fieldValue: string;
+  alreadyExisted: boolean;
+};

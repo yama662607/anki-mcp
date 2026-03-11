@@ -26,6 +26,15 @@ export type PreviewResult = {
   selectedCardIds: number[];
 };
 
+export type StoreMediaFileInput = {
+  filename: string;
+  path: string;
+};
+
+export type StoreMediaFileResult = {
+  storedFilename: string;
+};
+
 export type NoteTypeSummaryResult = {
   modelName: string;
   fieldNames: string[];
@@ -79,5 +88,7 @@ export interface AnkiGateway {
   upsertNoteType(input: UpsertNoteTypeInput): Promise<NoteTypeSchemaResult>;
   applyDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
   releaseDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
+  listMediaFiles(pattern: string): Promise<string[]>;
+  storeMediaFile(input: StoreMediaFileInput): Promise<StoreMediaFileResult>;
   deleteNote(noteId: number): Promise<void>;
 }

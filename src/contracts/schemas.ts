@@ -33,6 +33,14 @@ export const listCardTypeDefinitionsInputSchema = z
   .strict();
 
 export const listNoteTypesInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
+export const listStarterPacksInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
+
+export const starterPackOptionsInputSchema = z
+  .object({
+    deckRoot: z.string().min(1).max(180).optional(),
+    languages: z.array(z.string().min(1).max(32)).min(1).max(32).optional(),
+  })
+  .strict();
 
 export const getNoteTypeSchemaInputSchema = z
   .object({
@@ -65,6 +73,16 @@ export const upsertNoteTypeInputSchema = z
     css: z.string().optional(),
     isCloze: z.boolean().optional(),
     dryRun: z.boolean().optional(),
+  })
+  .strict();
+
+export const applyStarterPackInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    packId: z.string().min(1).max(120),
+    version: z.string().min(1).max(120).optional(),
+    dryRun: z.boolean().optional(),
+    options: starterPackOptionsInputSchema.optional(),
   })
   .strict();
 
@@ -223,11 +241,22 @@ export const cleanupDraftsInputSchema = z
   })
   .strict();
 
+export const importMediaAssetInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    localPath: z.string().min(1),
+    mediaKind: z.enum(['audio', 'image']).optional(),
+    preferredFilename: z.string().min(1).max(180).optional(),
+  })
+  .strict();
+
 export type ListCardTypesInput = z.infer<typeof listCardTypesInputSchema>;
 export type ListCardTypeDefinitionsInput = z.infer<typeof listCardTypeDefinitionsInputSchema>;
 export type ListNoteTypesInput = z.infer<typeof listNoteTypesInputSchema>;
+export type ListStarterPacksInput = z.infer<typeof listStarterPacksInputSchema>;
 export type GetNoteTypeSchemaInput = z.infer<typeof getNoteTypeSchemaInputSchema>;
 export type UpsertNoteTypeInput = z.infer<typeof upsertNoteTypeInputSchema>;
+export type ApplyStarterPackInput = z.infer<typeof applyStarterPackInputSchema>;
 export type UpsertCardTypeDefinitionInput = z.infer<typeof upsertCardTypeDefinitionInputSchema>;
 export type GetCardTypeSchemaInput = z.infer<typeof getCardTypeSchemaInputSchema>;
 export type CreateDraftInput = z.infer<typeof createDraftInputSchema>;
@@ -241,3 +270,4 @@ export type DiscardDraftsBatchInput = z.infer<typeof discardDraftsBatchInputSche
 export type DeprecateCardTypeDefinitionInput = z.infer<typeof deprecateCardTypeDefinitionInputSchema>;
 export type ListDraftsInput = z.infer<typeof listDraftsInputSchema>;
 export type CleanupDraftsInput = z.infer<typeof cleanupDraftsInputSchema>;
+export type ImportMediaAssetInput = z.infer<typeof importMediaAssetInputSchema>;

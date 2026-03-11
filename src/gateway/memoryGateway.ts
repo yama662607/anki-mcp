@@ -7,6 +7,8 @@ import type {
   NoteTypeSchemaResult,
   NoteTypeSummaryResult,
   PreviewResult,
+  StoreMediaFileInput,
+  StoreMediaFileResult,
   UpsertNoteTypeInput,
 } from './ankiGateway.js';
 
@@ -36,6 +38,7 @@ export class MemoryGateway implements AnkiGateway {
   private nextNoteId = 1000;
   private nextCardId = 5000;
   private readonly notes = new Map<number, InternalNote>();
+  private readonly media = new Map<string, string>();
   private readonly models = new Map<string, InternalModel>([
     [
       'Basic',
@@ -149,6 +152,16 @@ export class MemoryGateway implements AnkiGateway {
     note.suspended = false;
     note.tags = note.tags.filter((tag) => tag !== draftTag);
     note.modTimestamp = Date.now();
+  }
+
+  async listMediaFiles(pattern: string): Promise<string[]> {
+    const regex = new RegExp(`^${pattern.replace(/[.+^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\*/g, '.*')}$`);
+    return [...this.media.keys()].filter((filename) => regex.test(filename)).sort((left, right) => left.localeCompare(right));
+  }
+
+  async storeMediaFile(input: StoreMediaFileInput): Promise<StoreMediaFileResult> {
+    this.media.set(input.filename, input.path);
+    return { storedFilename: input.filename };
   }
 
   async deleteNote(noteId: number): Promise<void> {

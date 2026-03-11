@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createRuntime } from '../src/server.js';
@@ -65,6 +66,9 @@ describe('MCP server', () => {
       expect(byName.get('discard_draft')?.annotations?.destructiveHint).toBe(true);
       expect(byName.get('get_draft')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('create_drafts_batch')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('list_starter_packs')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('apply_starter_pack')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('import_media_asset')?.annotations?.readOnlyHint).toBe(false);
     } finally {
       await closeContext(context);
     }
@@ -78,6 +82,7 @@ describe('MCP server', () => {
       const uris = resources.resources.map((resource) => resource.uri);
       expect(uris).toContain('anki://contracts/v1/tools');
       expect(uris).toContain('anki://catalog/card-types');
+      expect(uris).toContain('anki://starter-packs/catalog');
 
       const contracts = await context.client.readResource({ uri: 'anki://contracts/v1/tools' });
       const payload = JSON.parse((contracts.contents[0] as { text: string }).text) as { tools?: Record<string, unknown> };
@@ -88,6 +93,9 @@ describe('MCP server', () => {
       expect(payload.tools).toHaveProperty('get_draft');
       expect(payload.tools).toHaveProperty('create_drafts_batch');
       expect(payload.tools).toHaveProperty('list_card_type_definitions');
+      expect(payload.tools).toHaveProperty('list_starter_packs');
+      expect(payload.tools).toHaveProperty('apply_starter_pack');
+      expect(payload.tools).toHaveProperty('import_media_asset');
     } finally {
       await closeContext(context);
     }
@@ -221,6 +229,157 @@ describe('MCP server', () => {
 
       expect(mismatch.code).toBe('PROFILE_SCOPE_MISMATCH');
       expect(mismatch.retryable).toBe(false);
+    } finally {
+      await closeContext(context);
+    }
+  });
+
+  it('provisions starter packs, imports media, and creates domain drafts through MCP tools', async () => {
+    const context = await createConnectedContext();
+    const tempDir = mkdtempSync(join(tmpdir(), 'anki-mcps-mcp-'));
+    const audioPath = join(tempDir, 'clip.mp3');
+    writeFileSync(audioPath, Buffer.from('clip-data'));
+
+    try {
+      const packs = parseToolResult(await context.client.callTool({
+        name: 'list_starter_packs',
+        arguments: { profileId: 'default' },
+      }));
+
+      expect(packs.packs.some((item: { packId: string }) => item.packId === 'english-core')).toBe(true);
+
+      const apply = parseToolResult(await context.client.callTool({
+        name: 'apply_starter_pack',
+        arguments: {
+          profileId: 'default',
+          packId: 'english-core',
+          dryRun: false,
+        },
+      }));
+
+      expect(apply.result.operations.some((operation: { id: string }) => operation.id === 'language.v1.vocab-recognition')).toBe(true);
+
+      const media = parseToolResult(await context.client.callTool({
+        name: 'import_media_asset',
+        arguments: {
+          profileId: 'default',
+          localPath: audioPath,
+        },
+      }));
+
+      expect(media.asset.fieldValue).toMatch(/^\[sound:/);
+
+      const draft = parseToolResult(await context.client.callTool({
+        name: 'create_draft',
+        arguments: {
+          profileId: 'default',
+          clientRequestId: 'english-listening-001',
+          cardTypeId: 'language.v1.english-listening-comprehension',
+          fields: {
+            Audio: media.asset.fieldValue,
+            Prompt: '何が聞こえますか？',
+            Answer: 'hello',
+            Transcript: 'hello',
+          },
+        },
+      }));
+
+      expect(draft.draft.cardTypeId).toBe('language.v1.english-listening-comprehension');
+
+      const preview = parseToolResult(await context.client.callTool({
+        name: 'open_draft_preview',
+        arguments: { profileId: 'default', draftId: draft.draft.draftId },
+      }));
+
+      expect(preview.preview.opened).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+      await closeContext(context);
+    }
+  });
+
+  it('executes programming and fundamentals starter-pack flows through finalize', async () => {
+    const context = await createConnectedContext();
+
+    try {
+      parseToolResult(await context.client.callTool({
+        name: 'apply_starter_pack',
+        arguments: {
+          profileId: 'default',
+          packId: 'programming-core',
+          dryRun: false,
+          options: { languages: ['typescript'] },
+        },
+      }));
+
+      const programmingDraft = parseToolResult(await context.client.callTool({
+        name: 'create_draft',
+        arguments: {
+          profileId: 'default',
+          clientRequestId: 'programming-output-001',
+          cardTypeId: 'programming.v1.typescript-output',
+          fields: {
+            Code: 'const answer = 40 + 2;\\nconsole.log(answer);',
+            Question: 'What is logged?',
+            Expected: '42',
+            Reason: 'The numeric addition is evaluated before logging.',
+          },
+        },
+      }));
+
+      const programmingPreview = parseToolResult(await context.client.callTool({
+        name: 'open_draft_preview',
+        arguments: { profileId: 'default', draftId: programmingDraft.draft.draftId },
+      }));
+      expect(programmingPreview.preview.opened).toBe(true);
+
+      const programmingDiscard = parseToolResult(await context.client.callTool({
+        name: 'discard_draft',
+        arguments: {
+          profileId: 'default',
+          draftId: programmingDraft.draft.draftId,
+          reason: 'user_request',
+        },
+      }));
+      expect(programmingDiscard.result.status).toBe('discarded');
+
+      parseToolResult(await context.client.callTool({
+        name: 'apply_starter_pack',
+        arguments: {
+          profileId: 'default',
+          packId: 'fundamentals-core',
+          dryRun: false,
+        },
+      }));
+
+      const fundamentalsDraft = parseToolResult(await context.client.callTool({
+        name: 'create_draft',
+        arguments: {
+          profileId: 'default',
+          clientRequestId: 'fundamentals-cloze-001',
+          cardTypeId: 'fundamentals.v1.cloze',
+          fields: {
+            Text: 'TCP uses {{c1::three-way handshake}} to establish a connection.',
+            Extra: 'SYN -> SYN/ACK -> ACK',
+          },
+        },
+      }));
+
+      const fundamentalsPreview = parseToolResult(await context.client.callTool({
+        name: 'open_draft_preview',
+        arguments: { profileId: 'default', draftId: fundamentalsDraft.draft.draftId },
+      }));
+      expect(fundamentalsPreview.preview.opened).toBe(true);
+
+      const fundamentalsDiscard = parseToolResult(await context.client.callTool({
+        name: 'discard_draft',
+        arguments: {
+          profileId: 'default',
+          draftId: fundamentalsDraft.draft.draftId,
+          reason: 'user_request',
+        },
+      }));
+      expect(fundamentalsDiscard.result.status).toBe('discarded');
     } finally {
       await closeContext(context);
     }

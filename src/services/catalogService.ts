@@ -2,7 +2,7 @@ import { AppError } from '../contracts/errors.js';
 import { CARD_TYPES, CATALOG_VERSION, findCardType } from '../contracts/catalog.js';
 import type { CardTypeDefinition, CardTypeSummary, CustomCardTypeDefinition, ValidationIssue } from '../contracts/types.js';
 import { DraftStore } from '../persistence/draftStore.js';
-import { normalizeTags, sortRecord } from '../utils/canonical.js';
+import { normalizeTags, sortRecord, toCanonicalJson } from '../utils/canonical.js';
 import { sanitizeByPolicy } from '../utils/sanitize.js';
 
 export type ValidateFieldsInput = {
@@ -170,6 +170,41 @@ export class CatalogService {
       ...definition,
       source: 'custom',
     }, updatedAt);
+  }
+
+  planCustomCardTypeDefinition(profileId: string, definition: CardTypeDefinition): 'create' | 'update' | 'unchanged' {
+    if (findCardType(definition.cardTypeId)) {
+      throw new AppError('CONFLICT', `Builtin cardTypeId cannot be overridden: ${definition.cardTypeId}`, {
+        hint: 'Choose a new custom cardTypeId instead of shadowing builtin behavior.',
+      });
+    }
+
+    this.assertDefinition(definition);
+    const existing = this.store.getCardTypeDefinition(profileId, definition.cardTypeId, { includeDeprecated: true });
+    if (!existing) {
+      return 'create';
+    }
+
+    const existingComparable = {
+      cardTypeId: existing.cardTypeId,
+      label: existing.label,
+      modelName: existing.modelName,
+      defaultDeck: existing.defaultDeck,
+      requiredFields: existing.requiredFields,
+      optionalFields: existing.optionalFields,
+      renderIntent: existing.renderIntent,
+      allowedHtmlPolicy: existing.allowedHtmlPolicy,
+      fields: existing.fields,
+      source: 'custom',
+    };
+    const desiredComparable = {
+      ...definition,
+      source: 'custom',
+    };
+
+    return toCanonicalJson(existingComparable) === toCanonicalJson(desiredComparable) && existing.status === 'active'
+      ? 'unchanged'
+      : 'update';
   }
 
   private requireCardType(
