@@ -147,12 +147,16 @@ export type StarterPackOptionDefinition = {
   defaultValue?: string | string[];
 };
 
+export type StarterPackOptionValue = string | string[];
+export type StarterPackSource = 'builtin' | 'custom';
+
 export type StarterPackSummary = {
   packId: string;
   label: string;
   version: string;
   domains: string[];
   supportedOptions: StarterPackOptionDefinition[];
+  source?: StarterPackSource;
 };
 
 export type StarterPackOperation = {
@@ -172,6 +176,26 @@ export type StarterPackManifest = StarterPackSummary & {
     isCloze?: boolean;
   }>;
   cardTypes: CardTypeDefinition[];
+};
+
+export type PackManifestStatus = 'active' | 'deprecated';
+
+export type CustomPackManifest = StarterPackManifest & {
+  source: 'custom';
+  profileId: string;
+  status: PackManifestStatus;
+  updatedAt: string;
+  deprecatedAt?: string;
+};
+
+export type PackResourceType = 'note_type' | 'card_type_definition';
+
+export type PackResourceBinding = {
+  profileId: string;
+  packId: string;
+  resourceType: PackResourceType;
+  resourceId: string;
+  updatedAt: string;
 };
 
 export type MediaKind = 'audio' | 'image';

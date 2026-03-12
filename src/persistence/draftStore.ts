@@ -5,10 +5,15 @@ import { AppError } from '../contracts/errors.js';
 import type {
   CardTypeDefinition,
   CardTypeDefinitionStatus,
+  CustomPackManifest,
   CustomCardTypeDefinition,
   DraftListItem,
   DraftRecord,
   DraftState,
+  PackManifestStatus,
+  PackResourceBinding,
+  PackResourceType,
+  StarterPackManifest,
 } from '../contracts/types.js';
 
 export type DraftRow = {
@@ -41,6 +46,23 @@ type CardTypeDefinitionRow = {
   status: CardTypeDefinitionStatus;
   updated_at: string;
   deprecated_at: string | null;
+};
+
+type PackManifestRow = {
+  profile_id: string;
+  pack_id: string;
+  manifest_json: string;
+  status: PackManifestStatus;
+  updated_at: string;
+  deprecated_at: string | null;
+};
+
+type PackResourceBindingRow = {
+  profile_id: string;
+  pack_id: string;
+  resource_type: PackResourceType;
+  resource_id: string;
+  updated_at: string;
 };
 
 export class DraftStore {
@@ -316,6 +338,114 @@ export class DraftStore {
     return rows.map((row) => mapRowToCustomCardTypeDefinition(row));
   }
 
+  upsertPackManifest(profileId: string, manifest: StarterPackManifest, updatedAt: string): CustomPackManifest {
+    this.db
+      .prepare(
+        `
+        INSERT INTO pack_manifests (
+          profile_id, pack_id, manifest_json, status, updated_at, deprecated_at
+        ) VALUES (?, ?, ?, 'active', ?, NULL)
+        ON CONFLICT(profile_id, pack_id)
+        DO UPDATE SET
+          manifest_json = excluded.manifest_json,
+          status = 'active',
+          updated_at = excluded.updated_at,
+          deprecated_at = NULL
+      `,
+      )
+      .run(profileId, manifest.packId, JSON.stringify(manifest), updatedAt);
+
+    const row = this.db
+      .prepare(`SELECT * FROM pack_manifests WHERE profile_id = ? AND pack_id = ?`)
+      .get(profileId, manifest.packId) as PackManifestRow;
+
+    return mapRowToCustomPackManifest(row);
+  }
+
+  deprecatePackManifest(profileId: string, packId: string, deprecatedAt: string): CustomPackManifest {
+    const result = this.db
+      .prepare(
+        `
+        UPDATE pack_manifests
+        SET status = 'deprecated', deprecated_at = ?, updated_at = ?
+        WHERE profile_id = ? AND pack_id = ?
+      `,
+      )
+      .run(deprecatedAt, deprecatedAt, profileId, packId);
+    if (Number(result.changes ?? 0) === 0) {
+      throw new AppError('NOT_FOUND', `Custom packId not found: ${packId}`);
+    }
+    return this.getPackManifest(profileId, packId, { includeDeprecated: true }) as CustomPackManifest;
+  }
+
+  getPackManifest(
+    profileId: string,
+    packId: string,
+    options?: { includeDeprecated?: boolean },
+  ): CustomPackManifest | undefined {
+    const where = options?.includeDeprecated ? '' : ` AND status = 'active'`;
+    const row = this.db
+      .prepare(`SELECT * FROM pack_manifests WHERE profile_id = ? AND pack_id = ?${where}`)
+      .get(profileId, packId) as PackManifestRow | undefined;
+    return row ? mapRowToCustomPackManifest(row) : undefined;
+  }
+
+  listPackManifests(profileId: string, options?: { includeDeprecated?: boolean }): CustomPackManifest[] {
+    const where = options?.includeDeprecated ? '' : ` AND status = 'active'`;
+    const rows = this.db
+      .prepare(`SELECT * FROM pack_manifests WHERE profile_id = ?${where} ORDER BY pack_id ASC`)
+      .all(profileId) as PackManifestRow[];
+    return rows.map((row) => mapRowToCustomPackManifest(row));
+  }
+
+  replacePackResourceBindings(
+    profileId: string,
+    packId: string,
+    bindings: Array<{ resourceType: PackResourceType; resourceId: string }>,
+    updatedAt: string,
+  ): void {
+    this.db.prepare(`DELETE FROM pack_resource_bindings WHERE profile_id = ? AND pack_id = ?`).run(profileId, packId);
+    const insert = this.db.prepare(
+      `
+      INSERT INTO pack_resource_bindings (
+        profile_id, pack_id, resource_type, resource_id, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+    `,
+    );
+    for (const binding of bindings) {
+      insert.run(profileId, packId, binding.resourceType, binding.resourceId, updatedAt);
+    }
+  }
+
+  listPackResourceBindings(profileId: string, packId: string): PackResourceBinding[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT * FROM pack_resource_bindings
+        WHERE profile_id = ? AND pack_id = ?
+        ORDER BY resource_type ASC, resource_id ASC
+      `,
+      )
+      .all(profileId, packId) as PackResourceBindingRow[];
+    return rows.map((row) => mapRowToPackResourceBinding(row));
+  }
+
+  getPackResourceOwner(
+    profileId: string,
+    resourceType: PackResourceType,
+    resourceId: string,
+  ): PackResourceBinding | undefined {
+    const row = this.db
+      .prepare(
+        `
+        SELECT * FROM pack_resource_bindings
+        WHERE profile_id = ? AND resource_type = ? AND resource_id = ?
+      `,
+      )
+      .get(profileId, resourceType, resourceId) as PackResourceBindingRow | undefined;
+    return row ? mapRowToPackResourceBinding(row) : undefined;
+  }
+
   private initialize(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS drafts (
@@ -358,6 +488,25 @@ export class DraftStore {
         deprecated_at TEXT,
         PRIMARY KEY (profile_id, card_type_id)
       );
+
+      CREATE TABLE IF NOT EXISTS pack_manifests (
+        profile_id TEXT NOT NULL,
+        pack_id TEXT NOT NULL,
+        manifest_json TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        updated_at TEXT NOT NULL,
+        deprecated_at TEXT,
+        PRIMARY KEY (profile_id, pack_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS pack_resource_bindings (
+        profile_id TEXT NOT NULL,
+        pack_id TEXT NOT NULL,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (profile_id, resource_type, resource_id)
+      );
     `);
 
     this.ensureDraftColumns();
@@ -366,6 +515,12 @@ export class DraftStore {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_card_type_definitions_profile_status
         ON card_type_definitions(profile_id, status, card_type_id);
+
+      CREATE INDEX IF NOT EXISTS idx_pack_manifests_profile_status
+        ON pack_manifests(profile_id, status, pack_id);
+
+      CREATE INDEX IF NOT EXISTS idx_pack_resource_bindings_pack
+        ON pack_resource_bindings(profile_id, pack_id, resource_type, resource_id);
     `);
   }
 
@@ -443,5 +598,27 @@ function mapRowToCustomCardTypeDefinition(row: CardTypeDefinitionRow): CustomCar
     status: row.status ?? 'active',
     updatedAt: row.updated_at,
     deprecatedAt: row.deprecated_at ?? undefined,
+  };
+}
+
+function mapRowToCustomPackManifest(row: PackManifestRow): CustomPackManifest {
+  const manifest = JSON.parse(row.manifest_json) as StarterPackManifest;
+  return {
+    ...manifest,
+    source: 'custom',
+    profileId: row.profile_id,
+    status: row.status ?? 'active',
+    updatedAt: row.updated_at,
+    deprecatedAt: row.deprecated_at ?? undefined,
+  };
+}
+
+function mapRowToPackResourceBinding(row: PackResourceBindingRow): PackResourceBinding {
+  return {
+    profileId: row.profile_id,
+    packId: row.pack_id,
+    resourceType: row.resource_type,
+    resourceId: row.resource_id,
+    updatedAt: row.updated_at,
   };
 }
