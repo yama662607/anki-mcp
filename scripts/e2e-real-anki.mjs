@@ -34,6 +34,51 @@ async function callTool(name, args) {
   return parseToolResult(await client.callTool({ name, arguments: args }));
 }
 
+function buildCustomPackManifest() {
+  return {
+    packId: 'custom.e2e.basic-pack',
+    label: 'E2E Custom Pack',
+    version: '2026-03-12.v1',
+    domains: ['testing'],
+    supportedOptions: [],
+    deckRoots: ['Testing::E2E::CustomPack'],
+    tagTemplates: {
+      'e2e.pack.v1.basic': ['domain::testing', 'skill::e2e'],
+    },
+    noteTypes: [
+      {
+        modelName: 'e2e.pack.v1.basic',
+        fields: [{ name: 'Prompt' }, { name: 'Answer' }],
+        templates: [
+          {
+            name: 'Card 1',
+            front: '<div class="e2e-pack">{{Prompt}}</div>',
+            back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>',
+          },
+        ],
+        css: '.card { background: #10151d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 16px; } .e2e-pack { font-size: 18px; line-height: 1.6; }',
+      },
+    ],
+    cardTypes: [
+      {
+        cardTypeId: 'e2e.pack.v1.basic',
+        label: 'E2E Custom Basic',
+        modelName: 'e2e.pack.v1.basic',
+        defaultDeck: 'Testing::E2E::CustomPack',
+        source: 'custom',
+        requiredFields: ['Prompt', 'Answer'],
+        optionalFields: [],
+        renderIntent: 'production',
+        allowedHtmlPolicy: 'safe_inline_html',
+        fields: [
+          { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+          { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+        ],
+      },
+    ],
+  };
+}
+
 async function runStart() {
   await callTool('upsert_note_type', {
     profileId,
@@ -176,6 +221,55 @@ async function runBatchStart() {
   }, null, 2));
 }
 
+async function runCustomPackStart() {
+  await callTool('upsert_pack_manifest', {
+    profileId,
+    manifest: buildCustomPackManifest(),
+  });
+
+  await callTool('apply_starter_pack', {
+    profileId,
+    packId: 'custom.e2e.basic-pack',
+    dryRun: false,
+  });
+
+  const draft = await callTool('create_draft', {
+    profileId,
+    clientRequestId: `real-e2e-custom-pack-${Date.now()}`,
+    cardTypeId: 'e2e.pack.v1.basic',
+    fields: {
+      Prompt: 'E2E custom pack prompt',
+      Answer: 'E2E custom pack answer',
+    },
+  });
+
+  const preview = await callTool('open_draft_preview', {
+    profileId,
+    draftId: draft.draft.draftId,
+  });
+
+  writeFileSync(statePath, JSON.stringify({
+    profileId,
+    mode,
+    packId: 'custom.e2e.basic-pack',
+    draftId: draft.draft.draftId,
+    noteId: draft.draft.noteId,
+    createdAt: new Date().toISOString(),
+  }, null, 2));
+
+  console.log(JSON.stringify({
+    ok: true,
+    scenario: 'start',
+    mode,
+    statePath,
+    packId: 'custom.e2e.basic-pack',
+    draftId: draft.draft.draftId,
+    noteId: draft.draft.noteId,
+    preview: preview.preview,
+    nextStep: 'Inspect the preview in Anki, then rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=commit|discard.',
+  }, null, 2));
+}
+
 async function runFinalize() {
   const state = JSON.parse(readFileSync(statePath, 'utf8'));
   let result;
@@ -243,6 +337,8 @@ try {
   if (scenario === 'start') {
     if (mode === 'batch') {
       await runBatchStart();
+    } else if (mode === 'custom-pack') {
+      await runCustomPackStart();
     } else {
       await runStart();
     }

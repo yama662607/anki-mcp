@@ -23,7 +23,7 @@
 
 - [x] 4.1 Add service tests for registry operations, dynamic options, and ownership conflict detection
 - [x] 4.2 Add MCP tests for the new registry tools and merged starter-pack discovery/apply contracts
-- [ ] 4.3 Extend the real-Anki smoke workflow to cover one minimal registered custom pack through `apply -> create_draft -> open_draft_preview -> discard_draft`
+- [x] 4.3 Extend the real-Anki smoke workflow to cover one minimal registered custom pack through `apply -> create_draft -> open_draft_preview -> discard_draft`
 
 ## 5. Documentation and Validation
 
