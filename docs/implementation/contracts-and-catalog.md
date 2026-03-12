@@ -27,6 +27,10 @@
   - `discard_drafts_batch`
   - `list_starter_packs`
   - `apply_starter_pack`
+  - `list_pack_manifests`
+  - `get_pack_manifest`
+  - `upsert_pack_manifest`
+  - `deprecate_pack_manifest`
   - `import_media_asset`
 
 ## 1.4 validation error/warning model
@@ -75,3 +79,15 @@ Each card type includes:
 - `create_draft` rejects deprecated custom `cardTypeId` values with `CONFLICT`.
 - starter packs are exposed via `anki://starter-packs/catalog`.
 - `apply_starter_pack` is the preferred way to bootstrap canonical domain note types and custom card type definitions.
+
+## 2.z custom pack manifest lifecycle
+
+- Custom pack manifests are profile-scoped and stored in SQLite.
+- Built-in pack IDs cannot be overridden by a custom manifest.
+- `list_starter_packs` merges built-in packs with active custom manifests.
+- `apply_starter_pack` accepts either a built-in pack or a registered custom pack.
+- Successful custom-pack apply records ownership for:
+  - note types
+  - custom card type definitions
+- Ownership conflicts surface as `CONFLICT` before partial writes.
+- Reference workflow: [custom-pack-manifests.md](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/custom-pack-manifests.md)

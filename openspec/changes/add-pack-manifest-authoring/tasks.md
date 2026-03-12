@@ -27,6 +27,6 @@
 
 ## 5. Documentation and Validation
 
-- [ ] 5.1 Add docs showing how an agent can invent a new reusable domain pack without editing MCP source code
-- [ ] 5.2 Document the ownership/conflict rules and rollback playbook for custom pack manifests
-- [ ] 5.3 Validate with `openspec validate add-pack-manifest-authoring --strict`, `npm run typecheck`, `npm test`, and `npm run build`
+- [x] 5.1 Add docs showing how an agent can invent a new reusable domain pack without editing MCP source code
+- [x] 5.2 Document the ownership/conflict rules and rollback playbook for custom pack manifests
+- [x] 5.3 Validate with `openspec validate add-pack-manifest-authoring --strict`, `npm run typecheck`, `npm test`, and `npm run build`

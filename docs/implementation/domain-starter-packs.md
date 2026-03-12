@@ -2,6 +2,8 @@
 
 This phase adds a thin bootstrap layer on top of the existing draft workflow.
 
+For agent-authored reusable packs that are not built into the MCP source, see [custom-pack-manifests.md](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/custom-pack-manifests.md).
+
 ## Canonical bootstrap flow
 
 1. `list_starter_packs`

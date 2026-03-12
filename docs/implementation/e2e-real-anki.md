@@ -41,6 +41,19 @@ What it does:
 - opens preview for the first draft
 - saves batch state to `.data/real-anki-e2e-state.json`
 
+## Custom pack smoke run
+
+```bash
+ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=custom-pack npm run e2e:anki
+```
+
+What it does:
+- registers a minimal custom pack with `upsert_pack_manifest`
+- applies it with `apply_starter_pack`
+- creates one draft from the new custom card type
+- opens preview
+- saves state to `.data/real-anki-e2e-state.json`
+
 ## Finalize after visual review
 
 Commit:
@@ -59,6 +72,12 @@ Batch finalize:
 
 ```bash
 ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch ANKI_E2E_SCENARIO=finalize ANKI_E2E_FINALIZE=discard npm run e2e:anki
+```
+
+Custom-pack finalize:
+
+```bash
+ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=custom-pack ANKI_E2E_SCENARIO=finalize ANKI_E2E_FINALIZE=discard npm run e2e:anki
 ```
 
 ## Why this is semi-automated
