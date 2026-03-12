@@ -106,6 +106,7 @@ const cardTypeDefinitionInputSchema = z
     label: z.string().min(1).max(180),
     modelName: modelNameSchema,
     defaultDeck: z.string().min(1).max(180),
+    source: z.literal('custom').optional(),
     requiredFields: z.array(fieldNameSchema),
     optionalFields: z.array(fieldNameSchema),
     renderIntent: z.enum(['recognition', 'production', 'cloze', 'mixed']),

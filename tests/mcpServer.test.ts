@@ -53,6 +53,59 @@ async function closeContext(context: RuntimeContext) {
   context.runtime.store.close();
 }
 
+function buildCustomPackManifest() {
+  return {
+    packId: 'custom.lang.ja-core',
+    label: 'Japanese Core',
+    version: '2026-03-12.v1',
+    domains: ['japanese'],
+    supportedOptions: [
+      {
+        name: 'deckRoot',
+        type: 'string',
+        required: false,
+        description: 'Deck root',
+        defaultValue: 'Languages::Japanese',
+      },
+    ],
+    deckRoots: ['Languages::Japanese'],
+    tagTemplates: {
+      'language.v1.japanese-vocab': ['domain::japanese', 'skill::vocabulary'],
+    },
+    noteTypes: [
+      {
+        modelName: 'language.v1.japanese-vocab',
+        fields: [{ name: 'Expression' }, { name: 'Meaning' }],
+        templates: [
+          {
+            name: 'Card 1',
+            front: '<div>{{Expression}}</div>',
+            back: '{{FrontSide}}<hr id="answer"><div>{{Meaning}}</div>',
+          },
+        ],
+        css: '.card { color: white; background: black; }',
+      },
+    ],
+    cardTypes: [
+      {
+        cardTypeId: 'language.v1.japanese-vocab',
+        label: 'Japanese Vocabulary',
+        modelName: 'language.v1.japanese-vocab',
+        defaultDeck: 'Languages::Japanese::Vocabulary',
+        source: 'custom',
+        requiredFields: ['Expression', 'Meaning'],
+        optionalFields: [],
+        renderIntent: 'recognition',
+        allowedHtmlPolicy: 'safe_inline_html',
+        fields: [
+          { name: 'Expression', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
+          { name: 'Meaning', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html', multiline: true },
+        ],
+      },
+    ],
+  };
+}
+
 describe('MCP server', () => {
   it('exposes tool annotations for read/write boundaries', async () => {
     const context = await createConnectedContext();
@@ -68,6 +121,10 @@ describe('MCP server', () => {
       expect(byName.get('create_drafts_batch')?.annotations?.readOnlyHint).toBe(false);
       expect(byName.get('list_starter_packs')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('apply_starter_pack')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('list_pack_manifests')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('get_pack_manifest')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('upsert_pack_manifest')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('deprecate_pack_manifest')?.annotations?.readOnlyHint).toBe(false);
       expect(byName.get('import_media_asset')?.annotations?.readOnlyHint).toBe(false);
     } finally {
       await closeContext(context);
@@ -85,7 +142,10 @@ describe('MCP server', () => {
       expect(uris).toContain('anki://starter-packs/catalog');
 
       const contracts = await context.client.readResource({ uri: 'anki://contracts/v1/tools' });
-      const payload = JSON.parse((contracts.contents[0] as { text: string }).text) as { tools?: Record<string, unknown> };
+      const payload = JSON.parse((contracts.contents[0] as { text: string }).text) as {
+        tools?: Record<string, unknown>;
+        sharedTypes?: Record<string, unknown>;
+      };
       expect(payload).toHaveProperty('contractVersion', '1.0.0');
       expect(payload.tools).toHaveProperty('upsert_note_type');
       expect(payload.tools).toHaveProperty('upsert_card_type_definition');
@@ -95,7 +155,12 @@ describe('MCP server', () => {
       expect(payload.tools).toHaveProperty('list_card_type_definitions');
       expect(payload.tools).toHaveProperty('list_starter_packs');
       expect(payload.tools).toHaveProperty('apply_starter_pack');
+      expect(payload.tools).toHaveProperty('list_pack_manifests');
+      expect(payload.tools).toHaveProperty('get_pack_manifest');
+      expect(payload.tools).toHaveProperty('upsert_pack_manifest');
+      expect(payload.tools).toHaveProperty('deprecate_pack_manifest');
       expect(payload.tools).toHaveProperty('import_media_asset');
+      expect(payload.sharedTypes).toHaveProperty('CustomPackManifest');
     } finally {
       await closeContext(context);
     }
@@ -380,6 +445,65 @@ describe('MCP server', () => {
         },
       }));
       expect(fundamentalsDiscard.result.status).toBe('discarded');
+    } finally {
+      await closeContext(context);
+    }
+  });
+
+  it('registers, inspects, applies, and deprecates custom packs through MCP tools', async () => {
+    const context = await createConnectedContext();
+
+    try {
+      const upsert = parseToolResult(await context.client.callTool({
+        name: 'upsert_pack_manifest',
+        arguments: {
+          profileId: 'default',
+          manifest: buildCustomPackManifest(),
+        },
+      }));
+
+      expect(upsert.pack.packId).toBe('custom.lang.ja-core');
+      expect(upsert.status).toBe('created');
+
+      const listedCustom = parseToolResult(await context.client.callTool({
+        name: 'list_pack_manifests',
+        arguments: { profileId: 'default' },
+      }));
+      expect(listedCustom.items.map((item: { packId: string }) => item.packId)).toEqual(['custom.lang.ja-core']);
+
+      const fetched = parseToolResult(await context.client.callTool({
+        name: 'get_pack_manifest',
+        arguments: { profileId: 'default', packId: 'custom.lang.ja-core' },
+      }));
+      expect(fetched.pack.source).toBe('custom');
+
+      const starterCatalog = parseToolResult(await context.client.callTool({
+        name: 'list_starter_packs',
+        arguments: { profileId: 'default' },
+      }));
+      expect(starterCatalog.packs.some((item: { packId: string; source: string }) => item.packId === 'custom.lang.ja-core' && item.source === 'custom')).toBe(true);
+
+      const apply = parseToolResult(await context.client.callTool({
+        name: 'apply_starter_pack',
+        arguments: {
+          profileId: 'default',
+          packId: 'custom.lang.ja-core',
+          dryRun: false,
+        },
+      }));
+      expect(apply.result.operations.some((operation: { id: string }) => operation.id === 'language.v1.japanese-vocab')).toBe(true);
+
+      const deprecated = parseToolResult(await context.client.callTool({
+        name: 'deprecate_pack_manifest',
+        arguments: { profileId: 'default', packId: 'custom.lang.ja-core' },
+      }));
+      expect(deprecated.pack.status).toBe('deprecated');
+
+      const relisted = parseToolResult(await context.client.callTool({
+        name: 'list_starter_packs',
+        arguments: { profileId: 'default' },
+      }));
+      expect(relisted.packs.some((item: { packId: string }) => item.packId === 'custom.lang.ja-core')).toBe(false);
     } finally {
       await closeContext(context);
     }

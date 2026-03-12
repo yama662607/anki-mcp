@@ -116,4 +116,38 @@ describe('PackManifestService', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('rejects invalid custom manifest validation errors', async () => {
+    const { dir, store, service } = createContext();
+
+    try {
+      await expect(service.upsertPackManifest({
+        profileId: 'default',
+        manifest: exampleManifest({
+          supportedOptions: [
+            {
+              name: 'difficulty',
+              type: 'string',
+              required: false,
+              description: 'Difficulty',
+              allowedValues: ['intro', 'advanced'],
+              defaultValue: 'expert',
+            },
+          ],
+        }),
+      })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+
+      await expect(service.upsertPackManifest({
+        profileId: 'default',
+        manifest: exampleManifest({
+          tagTemplates: {
+            'language.v1.unknown-card': ['domain::japanese'],
+          },
+        }),
+      })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    } finally {
+      store.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

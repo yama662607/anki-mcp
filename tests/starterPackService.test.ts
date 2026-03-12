@@ -277,6 +277,62 @@ describe('StarterPackService', () => {
     }
   });
 
+  it('rejects invalid custom option values and takeovers from another pack owner', async () => {
+    const context = createContext();
+
+    try {
+      await context.packManifestService.upsertPackManifest({
+        profileId: 'default',
+        manifest: customManifest({
+          supportedOptions: [
+            {
+              name: 'difficulty',
+              type: 'string',
+              required: false,
+              description: 'Difficulty band',
+              allowedValues: ['intro', 'core'],
+              defaultValue: 'intro',
+            },
+          ],
+        }),
+      });
+
+      await expect(
+        context.starterPackService.applyStarterPack({
+          profileId: 'default',
+          packId: 'custom.lang.ja-core',
+          dryRun: true,
+          options: { difficulty: 'expert' },
+        }),
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+
+      await context.starterPackService.applyStarterPack({
+        profileId: 'default',
+        packId: 'custom.lang.ja-core',
+        dryRun: false,
+      });
+
+      await context.packManifestService.upsertPackManifest({
+        profileId: 'default',
+        manifest: customManifest({
+          packId: 'custom.lang.ja-alt',
+          label: 'Japanese Alternate',
+        }),
+      });
+
+      await expect(
+        context.starterPackService.applyStarterPack({
+          profileId: 'default',
+          packId: 'custom.lang.ja-alt',
+          dryRun: true,
+        }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+    } finally {
+      context.store.close();
+      rmSync(context.dir, { recursive: true, force: true });
+    }
+  });
+
   it('imports local media and returns an Anki-ready audio token with dedupe', async () => {
     const context = createContext();
     const audioPath = join(context.dir, 'hello.mp3');
