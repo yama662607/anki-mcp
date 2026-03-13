@@ -37,7 +37,7 @@ It is designed for agents that need to inspect existing Anki structure, create o
 
 1. Install `anki-mcps` from npm.
 2. Start Anki with AnkiConnect enabled.
-3. Add the MCP server to your client config.
+3. Add the MCP server to your client.
 4. Ask the agent to run `get_runtime_status` first.
 5. Use the review-first flow: `add_note` -> `open_note_preview` -> `update_note` or `set_note_cards_suspended(false)`.
 
@@ -79,7 +79,35 @@ anki-mcps
 npm run dev
 ```
 
-## MCP client example
+## MCP client setup
+
+### Codex
+
+Official Codex setup is `codex mcp add` or `~/.codex/config.toml`.
+
+Add the server with the CLI:
+
+```bash
+codex mcp add anki-mcps \
+  --env ANKI_CONNECT_URL=http://127.0.0.1:8765 \
+  --env ANKI_ACTIVE_PROFILE=default \
+  -- anki-mcps
+```
+
+Equivalent `~/.codex/config.toml` entry:
+
+```toml
+[mcp_servers.anki-mcps]
+command = "anki-mcps"
+
+[mcp_servers.anki-mcps.env]
+ANKI_ACTIVE_PROFILE = "default"
+ANKI_CONNECT_URL = "http://127.0.0.1:8765"
+```
+
+### Claude-style clients
+
+Some MCP clients use `mcpServers` JSON instead.
 
 ```json
 {

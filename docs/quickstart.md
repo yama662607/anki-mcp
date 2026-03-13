@@ -24,7 +24,31 @@ http://127.0.0.1:8765
 
 ## 3. Add the MCP server to your client
 
-Example:
+### Codex
+
+Recommended:
+
+```bash
+codex mcp add anki-mcps \
+  --env ANKI_CONNECT_URL=http://127.0.0.1:8765 \
+  --env ANKI_ACTIVE_PROFILE=default \
+  -- anki-mcps
+```
+
+Equivalent `~/.codex/config.toml` entry:
+
+```toml
+[mcp_servers.anki-mcps]
+command = "anki-mcps"
+
+[mcp_servers.anki-mcps.env]
+ANKI_ACTIVE_PROFILE = "default"
+ANKI_CONNECT_URL = "http://127.0.0.1:8765"
+```
+
+### Claude-style clients
+
+If your client uses `mcpServers` JSON, use:
 
 ```json
 {
