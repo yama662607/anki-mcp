@@ -31,17 +31,24 @@ It is designed for agents that need to inspect existing Anki structure, create o
 
 - Node.js 22+
 - Anki with AnkiConnect enabled
-- optional: the AnkiConnect extension add-on for the best preview UX
+- optional: the `anki-connect-extension` add-on for direct preview instead of edit-dialog fallback
 
 ## Quick start
 
 1. Install `anki-mcps` from npm.
 2. Start Anki with AnkiConnect enabled.
 3. Add the MCP server to your client config.
-4. Ask the agent to run `list_decks` or `list_note_types` first.
+4. Ask the agent to run `get_runtime_status` first.
 5. Use the review-first flow: `add_note` -> `open_note_preview` -> `update_note` or `set_note_cards_suspended(false)`.
 
 For a first-time setup guide, see [5-minute quick start](docs/quickstart.md).
+
+## Dependency model
+
+- `AnkiConnect` is required for real Anki usage
+- `anki-connect-extension` is optional and only improves preview behavior
+- without the extension, `open_note_preview` falls back to opening the edit dialog
+- in `ANKI_GATEWAY_MODE=memory`, neither dependency is required because the server is running in test mode
 
 ## Installation
 
@@ -99,12 +106,13 @@ npm run dev
 
 ## Core workflow
 
-1. Discover existing structure with `list_decks`, `list_note_types`, `get_note_type_schema`, `search_notes`, and `get_notes`.
-2. Create missing decks with `ensure_deck`.
-3. Create or revise note types with `upsert_note_type(dryRun=true)` and inspect `result.validation`.
-4. Add review-pending content with `add_note` or `add_notes_batch`.
-5. Inspect the real Anki rendering with `open_note_preview`.
-6. After user feedback, call `update_note`, `delete_note`, or `set_note_cards_suspended(suspended=false)`.
+1. Verify setup with `get_runtime_status`.
+2. Discover existing structure with `list_decks`, `list_note_types`, `get_note_type_schema`, `search_notes`, and `get_notes`.
+3. Create missing decks with `ensure_deck`.
+4. Create or revise note types with `upsert_note_type(dryRun=true)` and inspect `result.validation`.
+5. Add review-pending content with `add_note` or `add_notes_batch`.
+6. Inspect the real Anki rendering with `open_note_preview`.
+7. After user feedback, call `update_note`, `delete_note`, or `set_note_cards_suspended(suspended=false)`.
 
 ## Media workflow
 

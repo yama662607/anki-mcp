@@ -2,6 +2,7 @@
 
 ## GUI preview
 
+- Setup check tool: `get_runtime_status`
 - Preview tool: `open_note_preview`
 - Primary path: `guiPreviewNote` from the optional `anki-connect-extension`
 - Fallback path: `guiBrowse -> guiSelectCard -> guiEditNote`
@@ -10,10 +11,11 @@ The MCP server does not render HTML itself. Preview is delegated to the running 
 
 ## Human review loop
 
-1. `add_note` or `add_notes_batch`
-2. `open_note_preview`
-3. user sends natural-language feedback
-4. agent calls `update_note`, `delete_note`, or `set_note_cards_suspended`
+1. `get_runtime_status`
+2. `add_note` or `add_notes_batch`
+3. `open_note_preview`
+4. user sends natural-language feedback
+5. agent calls `update_note`, `delete_note`, or `set_note_cards_suspended`
 
 There is no separate public commit checklist object anymore.
 

@@ -25,6 +25,27 @@ export const TOOL_CONTRACTS_V1 = {
         deckName: { type: 'string' },
       },
     },
+    RuntimeStatus: {
+      type: 'object',
+      required: [
+        'ready',
+        'gatewayMode',
+        'ankiConnectReachable',
+        'extensionInstalled',
+        'previewMode',
+        'guidance',
+      ],
+      additionalProperties: false,
+      properties: {
+        ready: { type: 'boolean' },
+        gatewayMode: { enum: ['anki-connect', 'memory'] },
+        endpoint: { type: 'string' },
+        ankiConnectReachable: { type: 'boolean' },
+        extensionInstalled: { type: 'boolean' },
+        previewMode: { enum: ['extension-preview', 'edit-dialog-fallback', 'memory', 'unavailable'] },
+        guidance: { type: 'array', items: { type: 'string' } },
+      },
+    },
     NoteSummary: {
       type: 'object',
       required: ['noteId', 'modelName', 'deckName', 'tags', 'cardIds', 'modTimestamp'],
@@ -171,6 +192,21 @@ export const TOOL_CONTRACTS_V1 = {
     },
   },
   tools: {
+    get_runtime_status: {
+      request: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { profileId: { type: 'string' } },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'runtime'],
+        properties: {
+          ...baseResponse.properties,
+          runtime: { $ref: '#/sharedTypes/RuntimeStatus' },
+        },
+      },
+    },
     list_decks: {
       request: {
         type: 'object',

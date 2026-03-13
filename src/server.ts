@@ -8,6 +8,7 @@ import { AuthoringStore } from './persistence/authoringStore.js';
 import { MediaService } from './services/mediaService.js';
 import { NoteAuthoringService } from './services/noteAuthoringService.js';
 import { NoteTypeService } from './services/noteTypeService.js';
+import { RuntimeStatusService } from './services/runtimeStatusService.js';
 import { registerMcpHandlers } from './mcp/register.js';
 
 export type AppRuntime = {
@@ -29,6 +30,7 @@ export function createRuntime(): AppRuntime {
   const noteTypeService = new NoteTypeService(gateway, { activeProfileId });
   const noteAuthoringService = new NoteAuthoringService(store, gateway, { activeProfileId });
   const mediaService = new MediaService(gateway, { activeProfileId });
+  const runtimeStatusService = new RuntimeStatusService(gateway, { activeProfileId });
 
   const server = new McpServer(
     {
@@ -38,6 +40,7 @@ export function createRuntime(): AppRuntime {
     {
       instructions: [
         'Use official Anki concepts only: profile, deck, note type, note, card, tag, and media.',
+        'When setup is uncertain, call get_runtime_status first to confirm AnkiConnect reachability and preview mode.',
         'Discover structure with list_decks, list_note_types, get_note_type_schema, search_notes, and get_notes.',
         'Prepare deck targets with ensure_deck and author note types with upsert_note_type when needed.',
         'Create review-pending notes with add_note or add_notes_batch, then inspect with open_note_preview.',
@@ -52,6 +55,7 @@ export function createRuntime(): AppRuntime {
     noteTypeService,
     noteAuthoringService,
     mediaService,
+    runtimeStatusService,
   });
 
   return { server, store };

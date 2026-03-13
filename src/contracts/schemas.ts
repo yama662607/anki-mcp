@@ -57,6 +57,12 @@ export const listDecksInputSchema = z
   })
   .strict();
 
+export const getRuntimeStatusInputSchema = z
+  .object({
+    profileId: profileIdSchema.optional(),
+  })
+  .strict();
+
 export const searchNotesInputSchema = z
   .object({
     profileId: profileIdSchema.optional(),
@@ -187,6 +193,7 @@ export type ListNoteTypesInput = z.infer<typeof listNoteTypesInputSchema>;
 export type GetNoteTypeSchemaInput = z.infer<typeof getNoteTypeSchemaInputSchema>;
 export type UpsertNoteTypeInput = z.infer<typeof upsertNoteTypeInputSchema>;
 export type ListDecksInput = z.infer<typeof listDecksInputSchema>;
+export type GetRuntimeStatusInput = z.infer<typeof getRuntimeStatusInputSchema>;
 export type SearchNotesInput = z.infer<typeof searchNotesInputSchema>;
 export type GetNotesInput = z.infer<typeof getNotesInputSchema>;
 export type EnsureDeckInput = z.infer<typeof ensureDeckInputSchema>;

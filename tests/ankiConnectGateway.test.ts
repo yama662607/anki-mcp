@@ -83,6 +83,45 @@ describe('AnkiConnectGateway', () => {
     ]);
   });
 
+  it('reports runtime capabilities with extension preview when available', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string };
+        if (body.action === 'version') return ok(6);
+        if (body.action === 'apiReflect') return ok({ actions: ['guiPreviewNote'] });
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    await expect(gateway.getRuntimeCapabilities()).resolves.toEqual({
+      gatewayMode: 'anki-connect',
+      endpoint: 'http://127.0.0.1:8765',
+      ankiConnectReachable: true,
+      extensionInstalled: true,
+      previewMode: 'extension-preview',
+    });
+  });
+
+  it('reports unreachable runtime capabilities when AnkiConnect is unavailable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('connect ECONNREFUSED');
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    await expect(gateway.getRuntimeCapabilities()).resolves.toEqual({
+      gatewayMode: 'anki-connect',
+      endpoint: 'http://127.0.0.1:8765',
+      ankiConnectReachable: false,
+      extensionInstalled: false,
+      previewMode: 'unavailable',
+    });
+  });
+
   it('closes note dialog when extension close action is available', async () => {
     const calls: FetchCall[] = [];
     vi.stubGlobal(

@@ -5,6 +5,7 @@ import {
   deleteNoteInputSchema,
   deleteNotesBatchInputSchema,
   ensureDeckInputSchema,
+  getRuntimeStatusInputSchema,
   getNoteTypeSchemaInputSchema,
   getNotesInputSchema,
   importMediaAssetInputSchema,
@@ -19,6 +20,7 @@ import {
 import { MediaService } from '../services/mediaService.js';
 import { NoteAuthoringService } from '../services/noteAuthoringService.js';
 import { NoteTypeService } from '../services/noteTypeService.js';
+import { RuntimeStatusService } from '../services/runtimeStatusService.js';
 import { getContractsResourcePayload } from './contractsResource.js';
 import { errorResult, parseOrThrow, successResult } from './result.js';
 
@@ -26,6 +28,7 @@ export function registerMcpHandlers(server: McpServer, services: {
   noteTypeService: NoteTypeService;
   noteAuthoringService: NoteAuthoringService;
   mediaService: MediaService;
+  runtimeStatusService: RuntimeStatusService;
 }) {
   server.registerResource(
     'tool_contracts_v1',
@@ -44,6 +47,25 @@ export function registerMcpHandlers(server: McpServer, services: {
         },
       ],
     }),
+  );
+
+  server.registerTool(
+    'get_runtime_status',
+    {
+      title: 'Get Runtime Status',
+      description: 'Report whether AnkiConnect is reachable and whether preview can use the optional extension path.',
+      inputSchema: getRuntimeStatusInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(
+          await services.runtimeStatusService.getRuntimeStatus(parseOrThrow(getRuntimeStatusInputSchema, input)),
+        );
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
   );
 
   server.registerTool(

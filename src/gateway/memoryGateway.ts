@@ -7,6 +7,7 @@ import type {
   NoteTypeSchemaResult,
   NoteTypeSummaryResult,
   PreviewResult,
+  RuntimeCapabilities,
   StoreMediaFileInput,
   StoreMediaFileResult,
   UpsertNoteTypeInput,
@@ -64,6 +65,15 @@ export class MemoryGateway implements AnkiGateway {
       },
     ],
   ]);
+
+  async getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+    return {
+      gatewayMode: 'memory',
+      ankiConnectReachable: false,
+      extensionInstalled: false,
+      previewMode: 'memory',
+    };
+  }
 
   async listDecks(): Promise<string[]> {
     return [...this.decks].sort((left, right) => left.localeCompare(right));

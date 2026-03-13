@@ -36,6 +36,14 @@ export type StoreMediaFileResult = {
   storedFilename: string;
 };
 
+export type RuntimeCapabilities = {
+  gatewayMode: 'anki-connect' | 'memory';
+  endpoint?: string;
+  ankiConnectReachable: boolean;
+  extensionInstalled: boolean;
+  previewMode: 'extension-preview' | 'edit-dialog-fallback' | 'memory' | 'unavailable';
+};
+
 export type NoteTypeSummaryResult = {
   modelName: string;
   fieldNames: string[];
@@ -81,6 +89,7 @@ export type UpsertNoteTypeInput = {
 };
 
 export interface AnkiGateway {
+  getRuntimeCapabilities(): Promise<RuntimeCapabilities>;
   listDecks(): Promise<string[]>;
   createDeck(deckName: string): Promise<void>;
   findNotes(query: string): Promise<number[]>;

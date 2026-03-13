@@ -7,6 +7,7 @@ import type {
   NoteTypeSchemaResult,
   NoteTypeSummaryResult,
   PreviewResult,
+  RuntimeCapabilities,
   StoreMediaFileInput,
   StoreMediaFileResult,
   UpsertNoteTypeInput,
@@ -22,6 +23,30 @@ export class AnkiConnectGateway implements AnkiGateway {
   private guiCloseNoteDialogSupported: boolean | undefined;
 
   constructor(private readonly endpoint = process.env.ANKI_CONNECT_URL ?? 'http://127.0.0.1:8765') {}
+
+  async getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+    try {
+      await this.call<number>('version', {});
+    } catch {
+      return {
+        gatewayMode: 'anki-connect',
+        endpoint: this.endpoint,
+        ankiConnectReachable: false,
+        extensionInstalled: false,
+        previewMode: 'unavailable',
+      };
+    }
+
+    const extensionInstalled = await this.supportsGuiPreviewNote();
+
+    return {
+      gatewayMode: 'anki-connect',
+      endpoint: this.endpoint,
+      ankiConnectReachable: true,
+      extensionInstalled,
+      previewMode: extensionInstalled ? 'extension-preview' : 'edit-dialog-fallback',
+    };
+  }
 
   async listDecks(): Promise<string[]> {
     const decks = await this.call<string[]>('deckNames', {});

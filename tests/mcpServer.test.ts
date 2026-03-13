@@ -58,6 +58,7 @@ describe('MCP server', () => {
       const byName = new Map(listed.tools.map((tool) => [tool.name, tool]));
 
       expect(byName.get('list_decks')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('get_runtime_status')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('search_notes')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('get_notes')?.annotations?.readOnlyHint).toBe(true);
       expect(byName.get('open_note_preview')?.annotations?.readOnlyHint).toBe(true);
@@ -96,6 +97,7 @@ describe('MCP server', () => {
 
       expect(payload).toHaveProperty('contractVersion', '1.0.0');
       expect(payload.tools).toHaveProperty('list_decks');
+      expect(payload.tools).toHaveProperty('get_runtime_status');
       expect(payload.tools).toHaveProperty('search_notes');
       expect(payload.tools).toHaveProperty('add_note');
       expect(payload.tools).toHaveProperty('update_note');
@@ -242,6 +244,33 @@ describe('MCP server', () => {
         },
       }));
       expect(deletedAgain.status).toBe('already_deleted');
+    } finally {
+      await closeContext(context);
+    }
+  });
+
+  it('reports runtime status so agents can verify setup before authoring', async () => {
+    const context = await createConnectedContext();
+
+    try {
+      const status = parseToolResult(await context.client.callTool({
+        name: 'get_runtime_status',
+        arguments: {
+          profileId: 'default',
+        },
+      }));
+
+      expect(status.profileId).toBe('default');
+      expect(status.runtime).toEqual({
+        ready: true,
+        gatewayMode: 'memory',
+        ankiConnectReachable: false,
+        extensionInstalled: false,
+        previewMode: 'memory',
+        guidance: [
+          'Running in memory gateway mode. This is suitable for tests only, not for a real Anki collection.',
+        ],
+      });
     } finally {
       await closeContext(context);
     }

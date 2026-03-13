@@ -100,3 +100,13 @@ export type ImportedMediaAsset = {
   fieldValue: string;
   alreadyExisted: boolean;
 };
+
+export type RuntimeStatus = {
+  ready: boolean;
+  gatewayMode: 'anki-connect' | 'memory';
+  endpoint?: string;
+  ankiConnectReachable: boolean;
+  extensionInstalled: boolean;
+  previewMode: 'extension-preview' | 'edit-dialog-fallback' | 'memory' | 'unavailable';
+  guidance: string[];
+};

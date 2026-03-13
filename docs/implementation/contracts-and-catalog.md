@@ -4,6 +4,7 @@ The public contract is published at `anki://contracts/v1/tools`.
 
 ## Read-only tools
 
+- `get_runtime_status`
 - `list_decks`
 - `list_note_types`
 - `get_note_type_schema`
@@ -29,6 +30,7 @@ Every write tool requires explicit `profileId`.
 
 ## Shared response shapes
 
+- `RuntimeStatus`
 - `DeckSummary`
 - `NoteSummary`
 - `NoteRecord`

@@ -14,7 +14,7 @@ Requirements:
 
 - Anki is running
 - AnkiConnect is installed and enabled
-- optional: the AnkiConnect extension add-on is installed for the best preview flow
+- optional: `anki-connect-extension` is installed if you want direct preview instead of edit-dialog fallback
 
 By default, `anki-mcps` talks to:
 
@@ -42,12 +42,15 @@ Example:
 
 ## 4. Verify that the connection works
 
-Ask your agent to call one of these tools first:
+Ask your agent to call:
 
-- `list_decks`
-- `list_note_types`
+- `get_runtime_status`
 
-If they return data, the MCP server can reach Anki.
+This tells you whether:
+
+- AnkiConnect is reachable
+- the optional extension preview path is available
+- the server is accidentally running in memory mode
 
 ## 5. Follow the normal authoring flow
 
@@ -73,7 +76,7 @@ That forces the agent to inspect the current collection before writing anything.
 ## Troubleshooting
 
 - `Failed to fetch`: Anki or AnkiConnect is not reachable at `ANKI_CONNECT_URL`
-- preview does not open: install the AnkiConnect extension add-on, or fall back to manual Anki inspection
+- preview opens the edit dialog instead: install `anki-connect-extension` if you want direct preview
 - write tools reject with `PROFILE_SCOPE_MISMATCH`: pass the correct `profileId`
 
 ## Next docs
