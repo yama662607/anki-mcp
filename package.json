@@ -1,6 +1,6 @@
 {
-  "name": "anki-mcps",
-  "version": "0.2.7",
+  "name": "@yama662607/anki-mcp",
+  "version": "0.3.0",
   "description": "MCP server for safe, review-first Anki authoring on official Anki concepts",
   "type": "module",
   "private": false,
@@ -8,7 +8,7 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "anki-mcps": "dist/src/index.js"
+    "anki-mcp": "dist/src/index.js"
   },
   "files": [
     "dist",
@@ -17,11 +17,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yama662607/anki-mcps.git"
+    "url": "git+https://github.com/yama662607/anki-mcp.git"
   },
-  "homepage": "https://github.com/yama662607/anki-mcps#readme",
+  "homepage": "https://github.com/yama662607/anki-mcp#readme",
   "bugs": {
-    "url": "https://github.com/yama662607/anki-mcps/issues"
+    "url": "https://github.com/yama662607/anki-mcp/issues"
   },
   "keywords": [
     "anki",

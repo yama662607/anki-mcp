@@ -32,7 +32,11 @@ export function createRuntime(): AppRuntime {
   const dataDir = resolve(process.cwd(), '.data');
   mkdirSync(dataDir, { recursive: true });
 
-  const dbPath = process.env.ANKI_MCPS_DB_PATH ?? process.env.DRAFT_DB_PATH ?? resolve(dataDir, 'anki-mcps.sqlite');
+  const dbPath =
+    process.env.ANKI_MCP_DB_PATH ??
+    process.env.ANKI_MCPS_DB_PATH ??
+    process.env.DRAFT_DB_PATH ??
+    resolve(dataDir, 'anki-mcp.sqlite');
 
   const gatewayMode = process.env.ANKI_GATEWAY_MODE ?? 'anki-connect';
   const gateway = gatewayMode === 'memory' ? new MemoryGateway() : new AnkiConnectGateway();
@@ -45,7 +49,7 @@ export function createRuntime(): AppRuntime {
 
   const server = new McpServer(
     {
-      name: 'anki-mcps',
+      name: 'anki-mcp',
       version: appVersion.version,
     },
     {

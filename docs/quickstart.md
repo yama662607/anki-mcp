@@ -1,11 +1,11 @@
 # 5-Minute Quick Start
 
-This is the shortest path from zero to a working `anki-mcps` setup.
+This is the shortest path from zero to a working `anki-mcp` setup.
 
 ## 1. Install the package
 
 ```bash
-npm install -g anki-mcps
+npm install -g @yama662607/anki-mcp
 ```
 
 ## 2. Start Anki
@@ -16,7 +16,7 @@ Requirements:
 - AnkiConnect is installed and enabled
 - optional: `anki-connect-extension` is installed if you want a read-only native preview instead of edit-dialog fallback
 
-By default, `anki-mcps` talks to:
+By default, `anki-mcp` talks to:
 
 ```text
 http://127.0.0.1:8765
@@ -29,19 +29,19 @@ http://127.0.0.1:8765
 Recommended:
 
 ```bash
-codex mcp add anki-mcps \
+codex mcp add anki-mcp \
   --env ANKI_CONNECT_URL=http://127.0.0.1:8765 \
   --env ANKI_ACTIVE_PROFILE=default \
-  -- anki-mcps
+  -- anki-mcp
 ```
 
 Equivalent `~/.codex/config.toml` entry:
 
 ```toml
-[mcp_servers.anki-mcps]
-command = "anki-mcps"
+[mcp_servers.anki-mcp]
+command = "anki-mcp"
 
-[mcp_servers.anki-mcps.env]
+[mcp_servers.anki-mcp.env]
 ANKI_ACTIVE_PROFILE = "default"
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
 ```
@@ -53,8 +53,8 @@ If your client uses `mcpServers` JSON, use:
 ```json
 {
   "mcpServers": {
-    "anki-mcps": {
-      "command": "anki-mcps",
+    "anki-mcp": {
+      "command": "anki-mcp",
       "env": {
         "ANKI_CONNECT_URL": "http://127.0.0.1:8765",
         "ANKI_ACTIVE_PROFILE": "default"

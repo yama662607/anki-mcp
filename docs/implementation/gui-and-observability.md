@@ -47,8 +47,8 @@ Field contents are intentionally excluded from logs by default.
 
 ## Internal persistence
 
-- DB default: `.data/anki-mcps.sqlite`
-- Env override: `ANKI_MCPS_DB_PATH`
+- DB default: `.data/anki-mcp.sqlite`
+- Env override: `ANKI_MCP_DB_PATH`
 - Backward-compatible fallback: `DRAFT_DB_PATH`
 
 This storage is internal metadata only. Public clients should not depend on table names or internal rows.

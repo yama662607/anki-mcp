@@ -1,6 +1,6 @@
 # Anki Operating Model
 
-`anki-mcps` now exposes only official Anki concepts in the public API.
+`anki-mcp` now exposes only official Anki concepts in the public API.
 
 ## Public concepts
 

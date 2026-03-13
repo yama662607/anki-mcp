@@ -1,12 +1,14 @@
-# anki-mcps
+# anki-mcp
 
-[![npm version](https://img.shields.io/npm/v/anki-mcps)](https://www.npmjs.com/package/anki-mcps)
-[![CI](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/%40yama662607%2Fanki-mcp)](https://www.npmjs.com/package/@yama662607/anki-mcp)
+[![CI](https://github.com/yama662607/anki-mcp/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/yama662607/anki-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 MCP server for safe, review-first Anki authoring built on official Anki concepts: `profile`, `deck`, `note type`, `note`, `card`, `tag`, and `media`.
 
 It is designed for agents that need to inspect existing Anki structure, create or revise note types, add notes, preview the real Anki rendering, and only then release cards into study.
+
+The package was renamed from `anki-mcps` to `@yama662607/anki-mcp`. The CLI command is now `anki-mcp`.
 
 ## Why this exists
 
@@ -35,7 +37,7 @@ It is designed for agents that need to inspect existing Anki structure, create o
 
 ## Quick start
 
-1. Install `anki-mcps` from npm.
+1. Install `@yama662607/anki-mcp` from npm.
 2. Start Anki with AnkiConnect enabled.
 3. Add the MCP server to your client.
 4. Ask the agent to run `get_runtime_status` first.
@@ -55,7 +57,7 @@ For a first-time setup guide, see [5-minute quick start](docs/quickstart.md).
 ### From npm
 
 ```bash
-npm install -g anki-mcps
+npm install -g @yama662607/anki-mcp
 ```
 
 ### From source
@@ -70,7 +72,7 @@ npm run build
 ### As a local command
 
 ```bash
-anki-mcps
+anki-mcp
 ```
 
 ### From source
@@ -88,19 +90,19 @@ Official Codex setup is `codex mcp add` or `~/.codex/config.toml`.
 Add the server with the CLI:
 
 ```bash
-codex mcp add anki-mcps \
+codex mcp add anki-mcp \
   --env ANKI_CONNECT_URL=http://127.0.0.1:8765 \
   --env ANKI_ACTIVE_PROFILE=default \
-  -- anki-mcps
+  -- anki-mcp
 ```
 
 Equivalent `~/.codex/config.toml` entry:
 
 ```toml
-[mcp_servers.anki-mcps]
-command = "anki-mcps"
+[mcp_servers.anki-mcp]
+command = "anki-mcp"
 
-[mcp_servers.anki-mcps.env]
+[mcp_servers.anki-mcp.env]
 ANKI_ACTIVE_PROFILE = "default"
 ANKI_CONNECT_URL = "http://127.0.0.1:8765"
 ```
@@ -112,8 +114,8 @@ Some MCP clients use `mcpServers` JSON instead.
 ```json
 {
   "mcpServers": {
-    "anki-mcps": {
-      "command": "anki-mcps",
+    "anki-mcp": {
+      "command": "anki-mcp",
       "env": {
         "ANKI_CONNECT_URL": "http://127.0.0.1:8765",
         "ANKI_ACTIVE_PROFILE": "default"
@@ -127,10 +129,10 @@ Some MCP clients use `mcpServers` JSON instead.
 
 - `ANKI_CONNECT_URL` default: `http://127.0.0.1:8765`
 - `ANKI_ACTIVE_PROFILE` optional fallback for read tools
-- `ANKI_MCPS_DB_PATH` default: `.data/anki-mcps.sqlite`
+- `ANKI_MCP_DB_PATH` default: `.data/anki-mcp.sqlite`
 - `ANKI_GATEWAY_MODE=memory` for deterministic local tests without Anki
 
-`ANKI_MCPS_DB_PATH` is the internal SQLite path used for idempotency and operational metadata. `DRAFT_DB_PATH` is still accepted as a backward-compatible fallback.
+`ANKI_MCP_DB_PATH` is the internal SQLite path used for idempotency and operational metadata. `DRAFT_DB_PATH` is still accepted as a backward-compatible fallback.
 
 ## Core workflow
 

@@ -14,6 +14,7 @@ type RuntimeContext = {
 
 afterEach(() => {
   delete process.env.ANKI_GATEWAY_MODE;
+  delete process.env.ANKI_MCP_DB_PATH;
   delete process.env.ANKI_MCPS_DB_PATH;
   delete process.env.DRAFT_DB_PATH;
   delete process.env.ANKI_ACTIVE_PROFILE;
@@ -22,7 +23,7 @@ afterEach(() => {
 
 async function createConnectedContext(): Promise<RuntimeContext> {
   process.env.ANKI_GATEWAY_MODE = 'memory';
-  process.env.ANKI_MCPS_DB_PATH = dbPath;
+  process.env.ANKI_MCP_DB_PATH = dbPath;
   process.env.ANKI_ACTIVE_PROFILE = 'default';
 
   const runtime = createRuntime();

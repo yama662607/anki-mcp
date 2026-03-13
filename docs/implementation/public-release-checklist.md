@@ -4,9 +4,9 @@ This document is for repository and npm releases after `v0.1.0`.
 
 ## Current public entry points
 
-- GitHub repository: [yama662607/anki-mcps](https://github.com/yama662607/anki-mcps)
-- GitHub releases: [releases page](https://github.com/yama662607/anki-mcps/releases)
-- npm package: [anki-mcps](https://www.npmjs.com/package/anki-mcps)
+- GitHub repository: [yama662607/anki-mcp](https://github.com/yama662607/anki-mcp)
+- GitHub releases: [releases page](https://github.com/yama662607/anki-mcp/releases)
+- npm package: [anki-mcp](https://www.npmjs.com/package/@yama662607/anki-mcp)
 
 ## Before publishing
 
@@ -23,15 +23,15 @@ This document is for repository and npm releases after `v0.1.0`.
 1. Commit the version bump and push it.
 2. Run `npm publish --access public`.
 3. If npm requires write authentication, complete the browser or security-key approval flow.
-4. Verify the package with `npm view anki-mcps name version dist-tags.latest --json`.
+4. Verify the package with `npm view anki-mcp name version dist-tags.latest --json`.
 
 ## After publishing
 
 1. Create a GitHub release tag `v<version>` from the published commit.
 2. Add short release notes with the user-visible changes.
 3. Confirm the README badge shows the new npm version.
-4. Smoke-test installation with `npm install -g anki-mcps@<version>`.
-5. Smoke-test startup with `anki-mcps`.
+4. Smoke-test installation with `npm install -g @yama662607/anki-mcp@<version>`.
+5. Smoke-test startup with `anki-mcp`.
 
 ## Notes
 
