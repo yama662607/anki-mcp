@@ -23,6 +23,19 @@ export class AnkiConnectGateway implements AnkiGateway {
 
   constructor(private readonly endpoint = process.env.ANKI_CONNECT_URL ?? 'http://127.0.0.1:8765') {}
 
+  async listDecks(): Promise<string[]> {
+    const decks = await this.call<string[]>('deckNames', {});
+    return [...decks].sort((left, right) => left.localeCompare(right));
+  }
+
+  async createDeck(deckName: string): Promise<void> {
+    await this.call<number>('createDeck', { deck: deckName });
+  }
+
+  async findNotes(query: string): Promise<number[]> {
+    return this.call<number[]>('findNotes', { query });
+  }
+
   async createNote(input: CreateNoteInput): Promise<CreateNoteResult> {
     await this.call<number>('createDeck', { deck: input.deckName });
 
@@ -51,6 +64,7 @@ export class AnkiConnectGateway implements AnkiGateway {
   async getNoteSnapshot(noteId: number): Promise<NoteSnapshot> {
     const noteInfo = await this.getFirstNoteInfo(noteId);
     const cardIds = await this.call<number[]>('findCards', { query: `nid:${noteId}` });
+    const cards = cardIds.length > 0 ? await this.call<Array<{ deckName?: string }>>('cardsInfo', { cards: cardIds }) : [];
 
     const fields = Object.fromEntries(
       Object.entries(noteInfo.fields ?? {}).map(([name, payload]: [string, unknown]) => {
@@ -65,10 +79,36 @@ export class AnkiConnectGateway implements AnkiGateway {
       noteId,
       cardIds,
       modelName: noteInfo.modelName,
+      deckName: cards[0]?.deckName ?? '',
       fields,
       tags: (noteInfo.tags ?? []) as string[],
       modTimestamp: noteInfo.mod ?? Date.now(),
     };
+  }
+
+  async updateNoteFields(noteId: number, fields: Record<string, string>): Promise<void> {
+    await this.call<null>('updateNoteFields', {
+      note: {
+        id: noteId,
+        fields,
+      },
+    });
+  }
+
+  async replaceNoteTags(noteId: number, currentTags: string[], nextTags: string[]): Promise<void> {
+    if (currentTags.length > 0) {
+      await this.call<null>('removeTags', { notes: [noteId], tags: currentTags.join(' ') });
+    }
+    if (nextTags.length > 0) {
+      await this.call<null>('addTags', { notes: [noteId], tags: nextTags.join(' ') });
+    }
+  }
+
+  async setCardsSuspended(cardIds: number[], suspended: boolean): Promise<void> {
+    if (cardIds.length === 0) {
+      return;
+    }
+    await this.call<boolean>(suspended ? 'suspend' : 'unsuspend', { cards: cardIds });
   }
 
   async openBrowserForNote(noteId: number): Promise<PreviewResult> {
@@ -202,19 +242,6 @@ export class AnkiConnectGateway implements AnkiGateway {
     });
 
     return this.getNoteTypeSchema(input.modelName);
-  }
-
-  async applyDraftIsolation(_noteId: number, cardIds: number[], _draftTag: string): Promise<void> {
-    if (cardIds.length > 0) {
-      await this.call<boolean>('suspend', { cards: cardIds });
-    }
-  }
-
-  async releaseDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void> {
-    if (cardIds.length > 0) {
-      await this.call<boolean>('unsuspend', { cards: cardIds });
-    }
-    await this.call<unknown>('removeTags', { notes: [noteId], tags: draftTag });
   }
 
   async listMediaFiles(pattern: string): Promise<string[]> {

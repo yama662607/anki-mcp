@@ -1,6 +1,6 @@
-# TypeScript v1 Card Pack
+# TypeScript v1 Note Type Templates
 
-This file records the applied TypeScript note types and starter cards currently in use.
+This file records the applied TypeScript note types and starter notes currently in use.
 
 ## 1) `ts.v1.concept`
 

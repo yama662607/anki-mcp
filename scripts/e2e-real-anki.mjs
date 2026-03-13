@@ -8,7 +8,7 @@ const stateDir = resolve(cwd, '.data');
 const statePath = resolve(stateDir, 'real-anki-e2e-state.json');
 const scenario = process.env.ANKI_E2E_SCENARIO ?? 'start';
 const profileId = process.env.ANKI_E2E_PROFILE_ID;
-const finalize = process.env.ANKI_E2E_FINALIZE ?? 'discard';
+const finalize = process.env.ANKI_E2E_FINALIZE ?? 'delete';
 const mode = process.env.ANKI_E2E_MODE ?? 'single';
 
 if (!profileId) {
@@ -34,102 +34,52 @@ async function callTool(name, args) {
   return parseToolResult(await client.callTool({ name, arguments: args }));
 }
 
-function buildCustomPackManifest() {
-  return {
-    packId: 'custom.e2e.basic-pack',
-    label: 'E2E Custom Pack',
-    version: '2026-03-12.v1',
-    domains: ['testing'],
-    supportedOptions: [],
-    deckRoots: ['Testing::E2E::CustomPack'],
-    tagTemplates: {
-      'e2e.pack.v1.basic': ['domain::testing', 'skill::e2e'],
-    },
-    noteTypes: [
-      {
-        modelName: 'e2e.pack.v1.basic',
-        fields: [{ name: 'Prompt' }, { name: 'Answer' }],
-        templates: [
-          {
-            name: 'Card 1',
-            front: '<div class="e2e-pack">{{Prompt}}</div>',
-            back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>',
-          },
-        ],
-        css: '.card { background: #10151d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 16px; } .e2e-pack { font-size: 18px; line-height: 1.6; }',
-      },
-    ],
-    cardTypes: [
-      {
-        cardTypeId: 'e2e.pack.v1.basic',
-        label: 'E2E Custom Basic',
-        modelName: 'e2e.pack.v1.basic',
-        defaultDeck: 'Testing::E2E::CustomPack',
-        source: 'custom',
-        requiredFields: ['Prompt', 'Answer'],
-        optionalFields: [],
-        renderIntent: 'production',
-        allowedHtmlPolicy: 'safe_inline_html',
-        fields: [
-          { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-          { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-        ],
-      },
-    ],
-  };
-}
+async function ensureNoteTypeAndDeck(deckName) {
+  await callTool('ensure_deck', {
+    profileId,
+    deckName,
+  });
 
-async function runStart() {
   await callTool('upsert_note_type', {
     profileId,
-    modelName: 'e2e.v1.basic',
+    modelName: 'e2e.v1.review-note',
     dryRun: false,
-    fields: [{ name: 'Prompt' }, { name: 'Answer' }],
+    fields: [{ name: 'Prompt' }, { name: 'Answer' }, { name: 'Extra' }],
     templates: [{
       name: 'Card 1',
       front: '<div class="e2e">{{Prompt}}</div>',
-      back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>',
+      back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>{{#Extra}}<div class="extra">{{Extra}}</div>{{/Extra}}',
     }],
-    css: '.card { background: #10151d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 16px; } .e2e { font-size: 18px; line-height: 1.6; }',
+    css: '.card { background: #11161d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 20px; } .e2e { font-size: 20px; line-height: 1.6; } .extra { margin-top: 12px; color: #9fb3c8; font-size: 15px; }',
   });
+}
 
-  await callTool('upsert_card_type_definition', {
-    profileId,
-    definition: {
-      cardTypeId: 'e2e.v1.basic',
-      label: 'E2E Basic',
-      modelName: 'e2e.v1.basic',
-      defaultDeck: 'Testing::E2E',
-      requiredFields: ['Prompt', 'Answer'],
-      optionalFields: [],
-      renderIntent: 'production',
-      allowedHtmlPolicy: 'safe_inline_html',
-      fields: [
-        { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-        { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-      ],
-    },
-  });
+async function runSingleStart() {
+  const deckName = 'Testing::E2E::Single';
+  await ensureNoteTypeAndDeck(deckName);
 
-  const draft = await callTool('create_draft', {
+  const added = await callTool('add_note', {
     profileId,
-    clientRequestId: `real-e2e-${Date.now()}`,
-    cardTypeId: 'e2e.v1.basic',
+    clientRequestId: `real-e2e-single-${Date.now()}`,
+    deckName,
+    modelName: 'e2e.v1.review-note',
     fields: {
       Prompt: 'E2E test prompt',
       Answer: 'E2E test answer',
+      Extra: 'Initial review note',
     },
+    tags: ['e2e', 'review-pending'],
   });
 
-  const preview = await callTool('open_draft_preview', {
+  const preview = await callTool('open_note_preview', {
     profileId,
-    draftId: draft.draft.draftId,
+    noteId: added.note.noteId,
   });
 
   writeFileSync(statePath, JSON.stringify({
     profileId,
-    draftId: draft.draft.draftId,
-    noteId: draft.draft.noteId,
+    mode,
+    note: added.note,
     createdAt: new Date().toISOString(),
   }, null, 2));
 
@@ -138,75 +88,53 @@ async function runStart() {
     scenario: 'start',
     mode,
     statePath,
-    draftId: draft.draft.draftId,
-    noteId: draft.draft.noteId,
+    noteId: added.note.noteId,
     preview: preview.preview,
-    nextStep: 'Inspect the preview in Anki, then rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=commit|discard.',
+    nextStep: 'Inspect the preview in Anki, then rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=update|unsuspend|delete.',
   }, null, 2));
 }
 
 async function runBatchStart() {
-  await callTool('upsert_note_type', {
-    profileId,
-    modelName: 'e2e.v1.basic',
-    dryRun: false,
-    fields: [{ name: 'Prompt' }, { name: 'Answer' }],
-    templates: [{
-      name: 'Card 1',
-      front: '<div class="e2e">{{Prompt}}</div>',
-      back: '{{FrontSide}}<hr id="answer"><div>{{Answer}}</div>',
-    }],
-    css: '.card { background: #10151d; color: #edf3fb; font-family: "Avenir Next", "Noto Sans JP", sans-serif; padding: 16px; } .e2e { font-size: 18px; line-height: 1.6; }',
-  });
+  const deckName = 'Testing::E2E::Batch';
+  await ensureNoteTypeAndDeck(deckName);
 
-  await callTool('upsert_card_type_definition', {
-    profileId,
-    definition: {
-      cardTypeId: 'e2e.v1.basic',
-      label: 'E2E Basic',
-      modelName: 'e2e.v1.basic',
-      defaultDeck: 'Testing::E2E',
-      requiredFields: ['Prompt', 'Answer'],
-      optionalFields: [],
-      renderIntent: 'production',
-      allowedHtmlPolicy: 'safe_inline_html',
-      fields: [
-        { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-        { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-      ],
-    },
-  });
-
-  const now = Date.now();
-  const draft = await callTool('create_drafts_batch', {
+  const added = await callTool('add_notes_batch', {
     profileId,
     items: [
       {
         itemId: 'batch-1',
-        clientRequestId: `real-e2e-batch-1-${now}`,
-        cardTypeId: 'e2e.v1.basic',
-        fields: { Prompt: 'E2E batch prompt 1', Answer: 'E2E batch answer 1' },
+        clientRequestId: `real-e2e-batch-1-${Date.now()}`,
+        deckName,
+        modelName: 'e2e.v1.review-note',
+        fields: {
+          Prompt: 'E2E batch prompt 1',
+          Answer: 'E2E batch answer 1',
+          Extra: 'batch-1',
+        },
       },
       {
         itemId: 'batch-2',
-        clientRequestId: `real-e2e-batch-2-${now}`,
-        cardTypeId: 'e2e.v1.basic',
-        fields: { Prompt: 'E2E batch prompt 2', Answer: 'E2E batch answer 2' },
+        clientRequestId: `real-e2e-batch-2-${Date.now()}`,
+        deckName,
+        modelName: 'e2e.v1.review-note',
+        fields: {
+          Prompt: 'E2E batch prompt 2',
+          Answer: 'E2E batch answer 2',
+          Extra: 'batch-2',
+        },
       },
     ],
   });
 
-  const firstSuccess = draft.results.find((item) => item.ok);
+  const firstSuccess = added.results.find((item) => item.ok);
   const preview = firstSuccess
-    ? await callTool('open_draft_preview', { profileId, draftId: firstSuccess.draft.draftId })
+    ? await callTool('open_note_preview', { profileId, noteId: firstSuccess.note.noteId })
     : null;
 
   writeFileSync(statePath, JSON.stringify({
     profileId,
     mode,
-    items: draft.results
-      .filter((item) => item.ok)
-      .map((item) => ({ itemId: item.itemId, draftId: item.draft.draftId, noteId: item.draft.noteId })),
+    notes: added.results.filter((item) => item.ok).map((item) => item.note),
     createdAt: new Date().toISOString(),
   }, null, 2));
 
@@ -215,58 +143,9 @@ async function runBatchStart() {
     scenario: 'start',
     mode,
     statePath,
-    summary: draft.summary,
+    summary: added.summary,
     preview: preview?.preview ?? null,
-    nextStep: 'Rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=commit|discard to finalize the draft batch.',
-  }, null, 2));
-}
-
-async function runCustomPackStart() {
-  await callTool('upsert_pack_manifest', {
-    profileId,
-    manifest: buildCustomPackManifest(),
-  });
-
-  await callTool('apply_starter_pack', {
-    profileId,
-    packId: 'custom.e2e.basic-pack',
-    dryRun: false,
-  });
-
-  const draft = await callTool('create_draft', {
-    profileId,
-    clientRequestId: `real-e2e-custom-pack-${Date.now()}`,
-    cardTypeId: 'e2e.pack.v1.basic',
-    fields: {
-      Prompt: 'E2E custom pack prompt',
-      Answer: 'E2E custom pack answer',
-    },
-  });
-
-  const preview = await callTool('open_draft_preview', {
-    profileId,
-    draftId: draft.draft.draftId,
-  });
-
-  writeFileSync(statePath, JSON.stringify({
-    profileId,
-    mode,
-    packId: 'custom.e2e.basic-pack',
-    draftId: draft.draft.draftId,
-    noteId: draft.draft.noteId,
-    createdAt: new Date().toISOString(),
-  }, null, 2));
-
-  console.log(JSON.stringify({
-    ok: true,
-    scenario: 'start',
-    mode,
-    statePath,
-    packId: 'custom.e2e.basic-pack',
-    draftId: draft.draft.draftId,
-    noteId: draft.draft.noteId,
-    preview: preview.preview,
-    nextStep: 'Inspect the preview in Anki, then rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=commit|discard.',
+    nextStep: 'Inspect the preview in Anki, then rerun with ANKI_E2E_SCENARIO=finalize and ANKI_E2E_FINALIZE=unsuspend|delete.',
   }, null, 2));
 }
 
@@ -275,51 +154,44 @@ async function runFinalize() {
   let result;
 
   if (state.mode === 'batch') {
-    if (finalize === 'commit') {
-      result = await callTool('commit_drafts_batch', {
-        profileId: state.profileId,
-        items: state.items.map((item) => ({
-          itemId: item.itemId,
-          draftId: item.draftId,
-          reviewDecision: {
-            targetIdentityMatched: true,
-            questionConfirmed: true,
-            answerConfirmed: true,
-            reviewedAt: new Date().toISOString(),
-            reviewer: 'user',
-          },
+    if (finalize === 'unsuspend') {
+      result = await Promise.all(
+        state.notes.map((note) => callTool('set_note_cards_suspended', {
+          profileId: state.profileId,
+          noteId: note.noteId,
+          suspended: false,
         })),
-      });
+      );
     } else {
-      result = await callTool('discard_drafts_batch', {
+      result = await callTool('delete_notes_batch', {
         profileId: state.profileId,
-        items: state.items.map((item) => ({
-          itemId: item.itemId,
-          draftId: item.draftId,
-          reason: 'user_request',
+        items: state.notes.map((note) => ({
+          itemId: `delete-${note.noteId}`,
+          noteId: note.noteId,
         })),
       });
     }
+  } else if (finalize === 'update') {
+    result = await callTool('update_note', {
+      profileId: state.profileId,
+      noteId: state.note.noteId,
+      expectedModTimestamp: state.note.modTimestamp,
+      fields: {
+        Extra: 'Updated during real-Anki E2E finalize',
+      },
+      tags: ['e2e', 'reviewed'],
+    });
+  } else if (finalize === 'unsuspend') {
+    result = await callTool('set_note_cards_suspended', {
+      profileId: state.profileId,
+      noteId: state.note.noteId,
+      suspended: false,
+    });
   } else {
-    if (finalize === 'commit') {
-      result = await callTool('commit_draft', {
-        profileId: state.profileId,
-        draftId: state.draftId,
-        reviewDecision: {
-          targetIdentityMatched: true,
-          questionConfirmed: true,
-          answerConfirmed: true,
-          reviewedAt: new Date().toISOString(),
-          reviewer: 'user',
-        },
-      });
-    } else {
-      result = await callTool('discard_draft', {
-        profileId: state.profileId,
-        draftId: state.draftId,
-        reason: 'user_request',
-      });
-    }
+    result = await callTool('delete_note', {
+      profileId: state.profileId,
+      noteId: state.note.noteId,
+    });
   }
 
   rmSync(statePath, { force: true });
@@ -337,10 +209,8 @@ try {
   if (scenario === 'start') {
     if (mode === 'batch') {
       await runBatchStart();
-    } else if (mode === 'custom-pack') {
-      await runCustomPackStart();
     } else {
-      await runStart();
+      await runSingleStart();
     }
   } else if (scenario === 'finalize') {
     await runFinalize();

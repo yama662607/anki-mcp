@@ -15,6 +15,7 @@ export type NoteSnapshot = {
   noteId: number;
   cardIds: number[];
   modelName: string;
+  deckName: string;
   fields: Record<string, string>;
   tags: string[];
   modTimestamp: number;
@@ -80,15 +81,19 @@ export type UpsertNoteTypeInput = {
 };
 
 export interface AnkiGateway {
+  listDecks(): Promise<string[]>;
+  createDeck(deckName: string): Promise<void>;
+  findNotes(query: string): Promise<number[]>;
   createNote(input: CreateNoteInput): Promise<CreateNoteResult>;
   getNoteSnapshot(noteId: number): Promise<NoteSnapshot>;
+  updateNoteFields(noteId: number, fields: Record<string, string>): Promise<void>;
+  replaceNoteTags(noteId: number, currentTags: string[], nextTags: string[]): Promise<void>;
+  setCardsSuspended(cardIds: number[], suspended: boolean): Promise<void>;
   openBrowserForNote(noteId: number): Promise<PreviewResult>;
   closeNoteDialog(noteId: number): Promise<boolean>;
   listNoteTypes(): Promise<NoteTypeSummaryResult[]>;
   getNoteTypeSchema(modelName: string): Promise<NoteTypeSchemaResult>;
   upsertNoteType(input: UpsertNoteTypeInput): Promise<NoteTypeSchemaResult>;
-  applyDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
-  releaseDraftIsolation(noteId: number, cardIds: number[], draftTag: string): Promise<void>;
   listMediaFiles(pattern: string): Promise<string[]>;
   storeMediaFile(input: StoreMediaFileInput): Promise<StoreMediaFileResult>;
   deleteNote(noteId: number): Promise<void>;

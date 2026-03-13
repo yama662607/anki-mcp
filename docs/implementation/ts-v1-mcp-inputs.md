@@ -1,24 +1,23 @@
-# TypeScript Starter 3 Cards: MCP Tool Inputs
+# TypeScript v1: MCP Input Examples
 
-Current applied stack:
-- note types: `ts.v1.concept`, `ts.v1.output`, `ts.v1.debug`
-- custom card types:
-  - `programming.v1.ts-concept`
-  - `programming.v1.ts-output`
-  - `programming.v1.ts-debug`
+Current note types:
 
-## Recommended flow
+- `ts.v1.concept`
+- `ts.v1.output`
+- `ts.v1.debug`
 
-1. `upsert_note_type` (`dryRun=true`)
-2. `upsert_note_type` (`dryRun=false`)
-3. `upsert_card_type_definition`
-4. `create_draft`
-5. `open_draft_preview`
-6. `commit_draft`
+Recommended flow:
+
+1. `upsert_note_type` when the schema is missing
+2. `ensure_deck`
+3. `add_note`
+4. `open_note_preview`
+5. based on feedback: `update_note`, `delete_note`, or `set_note_cards_suspended(suspended=false)`
 
 ## 1) Bootstrap `ts.v1.concept`
 
 ### `upsert_note_type`
+
 ```json
 {
   "profileId": "local-main",
@@ -42,39 +41,25 @@ Current applied stack:
 }
 ```
 
-### `upsert_card_type_definition`
+### `ensure_deck`
+
 ```json
 {
   "profileId": "local-main",
-  "definition": {
-    "cardTypeId": "programming.v1.ts-concept",
-    "label": "TypeScript Concept",
-    "modelName": "ts.v1.concept",
-    "defaultDeck": "Programming::TypeScript::Concept",
-    "requiredFields": ["Prompt", "Answer"],
-    "optionalFields": ["DetailedExplanation", "Contrast", "Example"],
-    "renderIntent": "production",
-    "allowedHtmlPolicy": "safe_inline_html",
-    "fields": [
-      { "name": "Prompt", "required": true, "type": "text", "allowedHtmlPolicy": "safe_inline_html" },
-      { "name": "Answer", "required": true, "type": "text", "allowedHtmlPolicy": "safe_inline_html" },
-      { "name": "DetailedExplanation", "required": false, "type": "markdown", "allowedHtmlPolicy": "safe_inline_html", "multiline": true },
-      { "name": "Contrast", "required": false, "type": "text", "allowedHtmlPolicy": "safe_inline_html" },
-      { "name": "Example", "required": false, "type": "markdown", "allowedHtmlPolicy": "trusted_html", "multiline": true }
-    ]
-  }
+  "deckName": "Programming::TypeScript::Concept"
 }
 ```
 
-## 2) Concept card
+## 2) Concept note
 
-### `create_draft`
+### `add_note`
+
 ```json
 {
   "profileId": "local-main",
   "clientRequestId": "ts-ja-concept-001",
-  "cardTypeId": "programming.v1.ts-concept",
   "deckName": "Programming::TypeScript::Concept",
+  "modelName": "ts.v1.concept",
   "tags": ["programming", "typescript", "ts-concept", "starter"],
   "fields": {
     "Prompt": "any と unknown の実用上の違いは何ですか？",
@@ -86,15 +71,14 @@ Current applied stack:
 }
 ```
 
-## 3) Output card
+## 3) Output note
 
-### `create_draft`
 ```json
 {
   "profileId": "local-main",
   "clientRequestId": "ts-ja-output-001",
-  "cardTypeId": "programming.v1.ts-output",
   "deckName": "Programming::TypeScript::Output",
+  "modelName": "ts.v1.output",
   "tags": ["programming", "typescript", "ts-output", "starter"],
   "fields": {
     "Code": "const x: string | number = Math.random() > 0.5 ? \"hi\" : 42;\nif (typeof x === \"string\") {\n  console.log(x.toUpperCase());\n} else {\n  console.log(x.toFixed(1));\n}",
@@ -105,15 +89,14 @@ Current applied stack:
 }
 ```
 
-## 4) Debug card
+## 4) Debug note
 
-### `create_draft`
 ```json
 {
   "profileId": "local-main",
   "clientRequestId": "ts-ja-debug-001",
-  "cardTypeId": "programming.v1.ts-debug",
   "deckName": "Programming::TypeScript::Debug",
+  "modelName": "ts.v1.debug",
   "tags": ["programming", "typescript", "ts-debug", "starter"],
   "fields": {
     "BuggyCode": "type User = { name: string };\nfunction greet(user: User | null) {\n  return \"Hi \" + user.name;\n}",
@@ -125,29 +108,19 @@ Current applied stack:
 }
 ```
 
-## Review and commit
+## Review after add
 
-After `create_draft`, call:
-
-```json
-{
-  "profileId": "local-main",
-  "draftId": "<draftId-from-create>"
-}
-```
-
-Then commit only after explicit user approval:
+After `add_note`, call:
 
 ```json
 {
   "profileId": "local-main",
-  "draftId": "<draftId-from-create>",
-  "reviewDecision": {
-    "targetIdentityMatched": true,
-    "questionConfirmed": true,
-    "answerConfirmed": true,
-    "reviewedAt": "<ISO8601>",
-    "reviewer": "user"
-  }
+  "noteId": 1234567890
 }
 ```
+
+Then either:
+
+- fix it with `update_note`
+- remove it with `delete_note`
+- keep it with `set_note_cards_suspended` and `suspended: false`

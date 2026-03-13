@@ -1,93 +1,56 @@
-# Contracts and Catalog (Implementation Notes)
+# Contracts and Tool Surface
 
-## 1.1 `cardTypeId` naming and versioning
+The public contract is published at `anki://contracts/v1/tools`.
 
-- Naming: `<domain>.v<major>.<variant>`
-- Examples:
-  - `language.v1.basic-bilingual`
-  - `programming.v1.concept-qa`
-  - `fundamentals.v1.cloze-facts`
-- Rules:
-  - domain: `language | programming | fundamentals`
-  - major version increments for breaking template/field semantics
-  - variant is kebab-case and immutable once published
+## Read-only tools
 
-## 1.2 / 1.3 / 1.7 Tool contracts and schemas
+- `list_decks`
+- `list_note_types`
+- `get_note_type_schema`
+- `search_notes`
+- `get_notes`
+- `open_note_preview`
 
-- Frozen contract resource URI: `anki://contracts/v1/tools`
-- Source of truth: `src/contracts/toolContracts.ts`
-- Runtime resource exposure: `src/mcp/contractsResource.ts`
-- Catalog resource URI: `anki://catalog/card-types`
-- Additional authoring tools:
-  - `list_card_type_definitions`
-  - `deprecate_card_type_definition`
-  - `get_draft`
-  - `create_drafts_batch`
-  - `commit_drafts_batch`
-  - `discard_drafts_batch`
-  - `list_starter_packs`
-  - `apply_starter_pack`
-  - `list_pack_manifests`
-  - `get_pack_manifest`
-  - `upsert_pack_manifest`
-  - `deprecate_pack_manifest`
-  - `import_media_asset`
+These tools must not mutate Anki state.
 
-## 1.4 validation error/warning model
+## Write tools
 
-- Errors: hard failure (`valid=false`) such as missing required fields, unknown fields.
-- Warnings: non-fatal issues (`valid=true`) such as length recommendation overflow.
-- Validation implementation: `src/services/catalogService.ts`
+- `ensure_deck`
+- `upsert_note_type`
+- `add_note`
+- `add_notes_batch`
+- `update_note`
+- `delete_note`
+- `delete_notes_batch`
+- `set_note_cards_suspended`
+- `import_media_asset`
 
-## 1.5 strict request behavior (`additionalProperties=false`)
+Every write tool requires explicit `profileId`.
 
-- All zod request schemas use `.strict()`.
-- Implementation: `src/contracts/schemas.ts`
+## Shared response shapes
 
-## 1.6 minimum metadata
+- `DeckSummary`
+- `NoteSummary`
+- `NoteRecord`
+- `NoteTypeSummary`
+- `NoteTypeSchema`
+- `BatchSummary`
+- `MediaAsset`
 
-Each card type includes:
-- `cardTypeId`, `label`, `modelName`, `defaultDeck`, `requiredFields`
-- `renderIntent` (`recognition|production|cloze|mixed`)
-- `allowedHtmlPolicy` (`plain_text_only|safe_inline_html|trusted_html`)
+## Validation model
 
-## 1.8 sanitizer constraints
+- note field names are validated against the live note type schema
+- unknown note types return `NOT_FOUND`
+- unknown fields return `INVALID_ARGUMENT`
+- stale `expectedModTimestamp` returns `CONFLICT`
+- missing `profileId` on writes returns `PROFILE_REQUIRED`
 
-- `plain_text_only`: full HTML escape
-- `safe_inline_html`: strict allowlist (`b,strong,i,em,u,code,sub,sup,br,ruby,rt,span`) and attribute stripping
-- `trusted_html`: pass-through
-- Implementation: `src/utils/sanitize.ts`
+## Removed public surfaces
 
-## 2.x draft lifecycle contracts
+These are intentionally no longer part of the public contract:
 
-- State model and transitions: `draft -> committed|discarded|superseded`, `superseded -> discarded`
-- Idempotent create: required `clientRequestId` with payload fingerprint
-- Conflict detection: canonical fingerprint over model/fields/tags/profile/note/modTimestamp
-- Supersede workflow: source must be `draft`; old draft becomes `superseded`
-- Cleanup default: `72` hours
-- Study isolation: draft notes are suspended until commit
-- Batch operations are per-item and allow mixed success/failure in one response
-- Implementation: `src/services/draftService.ts`, `src/persistence/draftStore.ts`
-
-## 2.y custom card type lifecycle
-
-- Custom definitions are profile-scoped and stored in SQLite.
-- Status model: `active | deprecated`
-- `upsert_card_type_definition` reactivates a deprecated definition.
-- `list_card_types` returns active custom definitions only.
-- `list_card_type_definitions(includeDeprecated=true)` exposes deprecated definitions for audit and migration.
-- `create_draft` rejects deprecated custom `cardTypeId` values with `CONFLICT`.
-- starter packs are exposed via `anki://starter-packs/catalog`.
-- `apply_starter_pack` is the preferred way to bootstrap canonical domain note types and custom card type definitions.
-
-## 2.z custom pack manifest lifecycle
-
-- Custom pack manifests are profile-scoped and stored in SQLite.
-- Built-in pack IDs cannot be overridden by a custom manifest.
-- `list_starter_packs` merges built-in packs with active custom manifests.
-- `apply_starter_pack` accepts either a built-in pack or a registered custom pack.
-- Successful custom-pack apply records ownership for:
-  - note types
-  - custom card type definitions
-- Ownership conflicts surface as `CONFLICT` before partial writes.
-- Reference workflow: [custom-pack-manifests.md](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/custom-pack-manifests.md)
+- `pack`
+- `starter pack`
+- `pack manifest`
+- `card type definition`
+- `draft`

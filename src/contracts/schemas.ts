@@ -3,47 +3,19 @@ import { z } from 'zod';
 export const contractVersion = '1.0.0' as const;
 
 export const profileIdSchema = z.string().min(1).max(120);
-export const cardTypeIdSchema = z.string().min(1).max(120);
-export const draftIdSchema = z.string().min(1).max(120);
-export const clientRequestIdSchema = z.string().min(1).max(120);
-export const itemIdSchema = z.string().min(1).max(120);
 export const modelNameSchema = z.string().min(1).max(180);
 export const fieldNameSchema = z.string().min(1).max(180);
 export const templateNameSchema = z.string().min(1).max(180);
+export const deckNameSchema = z.string().min(1).max(180);
+export const noteIdSchema = z.number().int().positive();
+export const cardIdSchema = z.number().int().positive();
+export const itemIdSchema = z.string().min(1).max(120);
+export const clientRequestIdSchema = z.string().min(1).max(120);
 
-export const draftStateSchema = z.enum(['draft', 'superseded', 'committed', 'discarded']);
-
-export const reviewDecisionSchema = z
-  .object({
-    targetIdentityMatched: z.boolean(),
-    questionConfirmed: z.boolean(),
-    answerConfirmed: z.boolean(),
-    reviewedAt: z.string().datetime(),
-    reviewer: z.enum(['user', 'agent']),
-  })
-  .strict();
-
-export const listCardTypesInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
-
-export const listCardTypeDefinitionsInputSchema = z
-  .object({
-    profileId: profileIdSchema.optional(),
-    includeDeprecated: z.boolean().optional(),
-  })
-  .strict();
+export const fieldsInputSchema = z.record(fieldNameSchema, z.string());
+export const tagsInputSchema = z.array(z.string().min(1).max(180)).max(128);
 
 export const listNoteTypesInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
-export const listStarterPacksInputSchema = z.object({ profileId: profileIdSchema.optional() }).strict();
-
-export const starterPackOptionValueInputSchema = z.union([
-  z.string().min(1).max(180),
-  z.array(z.string().min(1).max(180)).min(1).max(64),
-]);
-
-export const starterPackOptionsInputSchema = z.record(
-  z.string().min(1).max(64),
-  starterPackOptionValueInputSchema,
-);
 
 export const getNoteTypeSchemaInputSchema = z
   .object({
@@ -67,17 +39,6 @@ export const noteTypeTemplateInputSchema = z
   })
   .strict();
 
-export const starterPackOptionDefinitionInputSchema = z
-  .object({
-    name: z.string().min(1).max(64),
-    type: z.enum(['string', 'string_array']),
-    required: z.boolean(),
-    description: z.string().min(1).max(1000),
-    allowedValues: z.array(z.string().min(1).max(180)).min(1).max(128).optional(),
-    defaultValue: starterPackOptionValueInputSchema.optional(),
-  })
-  .strict();
-
 export const upsertNoteTypeInputSchema = z
   .object({
     profileId: profileIdSchema,
@@ -90,223 +51,126 @@ export const upsertNoteTypeInputSchema = z
   })
   .strict();
 
-export const applyStarterPackInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    packId: z.string().min(1).max(120),
-    version: z.string().min(1).max(120).optional(),
-    dryRun: z.boolean().optional(),
-    options: starterPackOptionsInputSchema.optional(),
-  })
-  .strict();
-
-const cardTypeDefinitionInputSchema = z
-  .object({
-    cardTypeId: cardTypeIdSchema,
-    label: z.string().min(1).max(180),
-    modelName: modelNameSchema,
-    defaultDeck: z.string().min(1).max(180),
-    source: z.literal('custom').optional(),
-    requiredFields: z.array(fieldNameSchema),
-    optionalFields: z.array(fieldNameSchema),
-    renderIntent: z.enum(['recognition', 'production', 'cloze', 'mixed']),
-    allowedHtmlPolicy: z.enum(['plain_text_only', 'safe_inline_html', 'trusted_html']),
-    fields: z.array(
-      z
-        .object({
-          name: fieldNameSchema,
-          required: z.boolean(),
-          type: z.enum(['text', 'markdown', 'html', 'audio_ref', 'image_ref']),
-          allowedHtmlPolicy: z.enum(['plain_text_only', 'safe_inline_html', 'trusted_html']),
-          minLength: z.number().int().min(0).optional(),
-          maxLength: z.number().int().min(0).optional(),
-          multiline: z.boolean().optional(),
-          example: z.string().optional(),
-          hint: z.string().optional(),
-        })
-        .strict(),
-    ),
-  })
-  .strict();
-
-export const starterPackManifestInputSchema = z
-  .object({
-    packId: z.string().min(1).max(120),
-    label: z.string().min(1).max(180),
-    version: z.string().min(1).max(120),
-    domains: z.array(z.string().min(1).max(120)).min(1).max(32),
-    supportedOptions: z.array(starterPackOptionDefinitionInputSchema).max(64),
-    deckRoots: z.array(z.string().min(1).max(180)).min(1).max(64),
-    tagTemplates: z.record(z.string().min(1).max(120), z.array(z.string().min(1).max(180)).max(128)),
-    noteTypes: z.array(
-      z
-        .object({
-          modelName: modelNameSchema,
-          fields: z.array(noteTypeFieldInputSchema).min(1),
-          templates: z.array(noteTypeTemplateInputSchema).min(1),
-          css: z.string().optional(),
-          isCloze: z.boolean().optional(),
-        })
-        .strict(),
-    ).min(1),
-    cardTypes: z.array(cardTypeDefinitionInputSchema).min(1),
-  })
-  .strict();
-
-export const listPackManifestsInputSchema = z
+export const listDecksInputSchema = z
   .object({
     profileId: profileIdSchema.optional(),
-    includeDeprecated: z.boolean().optional(),
   })
   .strict();
 
-export const getPackManifestInputSchema = z
+export const searchNotesInputSchema = z
   .object({
     profileId: profileIdSchema.optional(),
-    packId: z.string().min(1).max(120),
-  })
-  .strict();
-
-export const upsertPackManifestInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    manifest: starterPackManifestInputSchema,
-  })
-  .strict();
-
-export const deprecatePackManifestInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    packId: z.string().min(1).max(120),
-  })
-  .strict();
-
-export const upsertCardTypeDefinitionInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    definition: cardTypeDefinitionInputSchema,
-  })
-  .strict();
-
-export const getCardTypeSchemaInputSchema = z
-  .object({
-    cardTypeId: cardTypeIdSchema,
-    profileId: profileIdSchema.optional(),
-  })
-  .strict();
-
-export const createDraftInputSchema = z
-  .object({
-    cardTypeId: cardTypeIdSchema,
-    profileId: profileIdSchema,
-    clientRequestId: clientRequestIdSchema,
-    fields: z.record(z.string(), z.string()),
-    deckName: z.string().min(1).max(180).optional(),
-    tags: z.array(z.string()).optional(),
-    supersedesDraftId: draftIdSchema.optional(),
-  })
-  .strict();
-
-export const createDraftsBatchInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    items: z.array(
-      z
-        .object({
-          itemId: itemIdSchema,
-          clientRequestId: clientRequestIdSchema,
-          cardTypeId: cardTypeIdSchema,
-          fields: z.record(z.string(), z.string()),
-          deckName: z.string().min(1).max(180).optional(),
-          tags: z.array(z.string()).optional(),
-          supersedesDraftId: draftIdSchema.optional(),
-        })
-        .strict(),
-    ).min(1).max(100),
-  })
-  .strict();
-
-export const getDraftInputSchema = z
-  .object({
-    draftId: draftIdSchema,
-    profileId: profileIdSchema.optional(),
-  })
-  .strict();
-
-export const openDraftPreviewInputSchema = z
-  .object({
-    draftId: draftIdSchema,
-    profileId: profileIdSchema.optional(),
-  })
-  .strict();
-
-export const commitDraftInputSchema = z
-  .object({
-    draftId: draftIdSchema,
-    profileId: profileIdSchema,
-    reviewDecision: reviewDecisionSchema,
-  })
-  .strict();
-
-export const commitDraftsBatchInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    items: z.array(
-      z
-        .object({
-          itemId: itemIdSchema,
-          draftId: draftIdSchema,
-          reviewDecision: reviewDecisionSchema,
-        })
-        .strict(),
-    ).min(1).max(100),
-  })
-  .strict();
-
-export const discardDraftInputSchema = z
-  .object({
-    draftId: draftIdSchema,
-    profileId: profileIdSchema,
-    reason: z.enum(['user_request', 'cleanup', 'superseded', 'conflict_recovery']).optional(),
-  })
-  .strict();
-
-export const discardDraftsBatchInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    items: z.array(
-      z
-        .object({
-          itemId: itemIdSchema,
-          draftId: draftIdSchema,
-          reason: z.enum(['user_request', 'cleanup', 'superseded', 'conflict_recovery']).optional(),
-        })
-        .strict(),
-    ).min(1).max(100),
-  })
-  .strict();
-
-export const deprecateCardTypeDefinitionInputSchema = z
-  .object({
-    profileId: profileIdSchema,
-    cardTypeId: cardTypeIdSchema,
-  })
-  .strict();
-
-export const listDraftsInputSchema = z
-  .object({
-    profileId: profileIdSchema.optional(),
-    states: z.array(draftStateSchema).optional(),
+    query: z.string().max(500).optional(),
+    modelNames: z.array(modelNameSchema).min(1).max(32).optional(),
+    deckNames: z.array(deckNameSchema).min(1).max(32).optional(),
+    tags: z.array(z.string().min(1).max(180)).min(1).max(32).optional(),
     limit: z.number().int().min(1).max(200).optional(),
-    cursor: z.string().optional(),
   })
   .strict();
 
-export const cleanupDraftsInputSchema = z
+export const getNotesInputSchema = z
+  .object({
+    profileId: profileIdSchema.optional(),
+    noteIds: z.array(noteIdSchema).min(1).max(100),
+  })
+  .strict();
+
+export const ensureDeckInputSchema = z
   .object({
     profileId: profileIdSchema,
-    olderThanHours: z.number().int().min(1).max(24 * 30).optional(),
-    states: z.array(z.enum(['draft', 'superseded'])).optional(),
+    deckName: deckNameSchema,
+  })
+  .strict();
+
+export const addNoteInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    clientRequestId: clientRequestIdSchema.optional(),
+    deckName: deckNameSchema,
+    modelName: modelNameSchema,
+    fields: fieldsInputSchema,
+    tags: tagsInputSchema.optional(),
+    suspendNewCards: z.boolean().optional(),
+  })
+  .strict();
+
+export const addNotesBatchInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    items: z
+      .array(
+        z
+          .object({
+            itemId: itemIdSchema,
+            clientRequestId: clientRequestIdSchema.optional(),
+            deckName: deckNameSchema,
+            modelName: modelNameSchema,
+            fields: fieldsInputSchema,
+            tags: tagsInputSchema.optional(),
+            suspendNewCards: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
+
+export const updateNoteInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    noteId: noteIdSchema,
+    expectedModTimestamp: z.number().int().nonnegative(),
+    fields: fieldsInputSchema.optional(),
+    tags: tagsInputSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (!value.fields && !value.tags) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either fields or tags must be provided',
+        path: ['fields'],
+      });
+    }
+  });
+
+export const deleteNoteInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    noteId: noteIdSchema,
+  })
+  .strict();
+
+export const deleteNotesBatchInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    items: z
+      .array(
+        z
+          .object({
+            itemId: itemIdSchema,
+            noteId: noteIdSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
+
+export const openNotePreviewInputSchema = z
+  .object({
+    profileId: profileIdSchema.optional(),
+    noteId: noteIdSchema,
+  })
+  .strict();
+
+export const setNoteCardsSuspendedInputSchema = z
+  .object({
+    profileId: profileIdSchema,
+    noteId: noteIdSchema,
+    suspended: z.boolean(),
   })
   .strict();
 
@@ -319,28 +183,18 @@ export const importMediaAssetInputSchema = z
   })
   .strict();
 
-export type ListCardTypesInput = z.infer<typeof listCardTypesInputSchema>;
-export type ListCardTypeDefinitionsInput = z.infer<typeof listCardTypeDefinitionsInputSchema>;
 export type ListNoteTypesInput = z.infer<typeof listNoteTypesInputSchema>;
-export type ListStarterPacksInput = z.infer<typeof listStarterPacksInputSchema>;
-export type ListPackManifestsInput = z.infer<typeof listPackManifestsInputSchema>;
-export type GetPackManifestInput = z.infer<typeof getPackManifestInputSchema>;
 export type GetNoteTypeSchemaInput = z.infer<typeof getNoteTypeSchemaInputSchema>;
 export type UpsertNoteTypeInput = z.infer<typeof upsertNoteTypeInputSchema>;
-export type ApplyStarterPackInput = z.infer<typeof applyStarterPackInputSchema>;
-export type UpsertPackManifestInput = z.infer<typeof upsertPackManifestInputSchema>;
-export type DeprecatePackManifestInput = z.infer<typeof deprecatePackManifestInputSchema>;
-export type UpsertCardTypeDefinitionInput = z.infer<typeof upsertCardTypeDefinitionInputSchema>;
-export type GetCardTypeSchemaInput = z.infer<typeof getCardTypeSchemaInputSchema>;
-export type CreateDraftInput = z.infer<typeof createDraftInputSchema>;
-export type CreateDraftsBatchInput = z.infer<typeof createDraftsBatchInputSchema>;
-export type GetDraftInput = z.infer<typeof getDraftInputSchema>;
-export type OpenDraftPreviewInput = z.infer<typeof openDraftPreviewInputSchema>;
-export type CommitDraftInput = z.infer<typeof commitDraftInputSchema>;
-export type CommitDraftsBatchInput = z.infer<typeof commitDraftsBatchInputSchema>;
-export type DiscardDraftInput = z.infer<typeof discardDraftInputSchema>;
-export type DiscardDraftsBatchInput = z.infer<typeof discardDraftsBatchInputSchema>;
-export type DeprecateCardTypeDefinitionInput = z.infer<typeof deprecateCardTypeDefinitionInputSchema>;
-export type ListDraftsInput = z.infer<typeof listDraftsInputSchema>;
-export type CleanupDraftsInput = z.infer<typeof cleanupDraftsInputSchema>;
+export type ListDecksInput = z.infer<typeof listDecksInputSchema>;
+export type SearchNotesInput = z.infer<typeof searchNotesInputSchema>;
+export type GetNotesInput = z.infer<typeof getNotesInputSchema>;
+export type EnsureDeckInput = z.infer<typeof ensureDeckInputSchema>;
+export type AddNoteInput = z.infer<typeof addNoteInputSchema>;
+export type AddNotesBatchInput = z.infer<typeof addNotesBatchInputSchema>;
+export type UpdateNoteInput = z.infer<typeof updateNoteInputSchema>;
+export type DeleteNoteInput = z.infer<typeof deleteNoteInputSchema>;
+export type DeleteNotesBatchInput = z.infer<typeof deleteNotesBatchInputSchema>;
+export type OpenNotePreviewInput = z.infer<typeof openNotePreviewInputSchema>;
+export type SetNoteCardsSuspendedInput = z.infer<typeof setNoteCardsSuspendedInputSchema>;
 export type ImportMediaAssetInput = z.infer<typeof importMediaAssetInputSchema>;

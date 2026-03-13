@@ -17,139 +17,60 @@ export const TOOL_CONTRACTS_V1 = {
     codes: ERROR_CODES,
   },
   sharedTypes: {
-    CardTypeSummary: {
+    DeckSummary: {
       type: 'object',
-      required: ['cardTypeId', 'label', 'modelName', 'defaultDeck', 'requiredFields', 'renderIntent', 'allowedHtmlPolicy', 'source'],
+      required: ['deckName'],
       additionalProperties: false,
       properties: {
-        cardTypeId: { type: 'string' },
-        label: { type: 'string' },
-        modelName: { type: 'string' },
-        defaultDeck: { type: 'string' },
-        requiredFields: { type: 'array', items: { type: 'string' } },
-        renderIntent: { enum: ['recognition', 'production', 'cloze', 'mixed'] },
-        allowedHtmlPolicy: { enum: ['plain_text_only', 'safe_inline_html', 'trusted_html'] },
-        source: { enum: ['builtin', 'custom'] },
-      },
-    },
-    CustomCardTypeDefinition: {
-      type: 'object',
-      required: [
-        'cardTypeId',
-        'label',
-        'modelName',
-        'defaultDeck',
-        'requiredFields',
-        'optionalFields',
-        'renderIntent',
-        'allowedHtmlPolicy',
-        'fields',
-        'source',
-        'profileId',
-        'status',
-        'updatedAt',
-      ],
-      additionalProperties: false,
-      properties: {
-        cardTypeId: { type: 'string' },
-        label: { type: 'string' },
-        modelName: { type: 'string' },
-        defaultDeck: { type: 'string' },
-        requiredFields: { type: 'array', items: { type: 'string' } },
-        optionalFields: { type: 'array', items: { type: 'string' } },
-        renderIntent: { enum: ['recognition', 'production', 'cloze', 'mixed'] },
-        allowedHtmlPolicy: { enum: ['plain_text_only', 'safe_inline_html', 'trusted_html'] },
-        fields: { type: 'array', items: { $ref: '#/sharedTypes/FieldSchema' } },
-        source: { const: 'custom' },
-        profileId: { type: 'string' },
-        status: { enum: ['active', 'deprecated'] },
-        updatedAt: { type: 'string' },
-        deprecatedAt: { type: 'string' },
-      },
-    },
-    FieldSchema: {
-      type: 'object',
-      required: ['name', 'required', 'type', 'allowedHtmlPolicy'],
-      additionalProperties: false,
-      properties: {
-        name: { type: 'string' },
-        required: { type: 'boolean' },
-        type: { enum: ['text', 'markdown', 'html', 'audio_ref', 'image_ref'] },
-        allowedHtmlPolicy: { enum: ['plain_text_only', 'safe_inline_html', 'trusted_html'] },
-        minLength: { type: 'number' },
-        maxLength: { type: 'number' },
-        multiline: { type: 'boolean' },
-        example: { type: 'string' },
-        hint: { type: 'string' },
-      },
-    },
-    ValidationIssue: {
-      type: 'object',
-      required: ['code', 'message'],
-      additionalProperties: false,
-      properties: {
-        code: { type: 'string' },
-        message: { type: 'string' },
-        field: { type: 'string' },
-        hint: { type: 'string' },
-      },
-    },
-    DraftRecord: {
-      type: 'object',
-      required: [
-        'draftId',
-        'profileId',
-        'noteId',
-        'cardIds',
-        'state',
-        'cardTypeId',
-        'fingerprint',
-        'chainDepth',
-        'fields',
-        'tags',
-        'deckName',
-        'modTimestamp',
-        'clientRequestId',
-        'draftMarkerTag',
-        'createdAt',
-        'updatedAt',
-      ],
-      additionalProperties: false,
-      properties: {
-        draftId: { type: 'string' },
-        profileId: { type: 'string' },
-        noteId: { type: 'number' },
-        cardIds: { type: 'array', items: { type: 'number' } },
-        state: { enum: ['draft', 'superseded', 'committed', 'discarded'] },
-        cardTypeId: { type: 'string' },
-        fingerprint: { type: 'string' },
-        supersedesDraftId: { type: 'string' },
-        chainDepth: { type: 'number' },
-        fields: { type: 'object', additionalProperties: { type: 'string' } },
-        tags: { type: 'array', items: { type: 'string' } },
         deckName: { type: 'string' },
-        modTimestamp: { type: 'number' },
-        clientRequestId: { type: 'string' },
-        draftMarkerTag: { type: 'string' },
-        createdAt: { type: 'string' },
-        updatedAt: { type: 'string' },
-        committedAt: { type: 'string' },
-        discardedAt: { type: 'string' },
       },
     },
-    DraftListItem: {
+    NoteSummary: {
       type: 'object',
-      required: ['draftId', 'noteId', 'state', 'cardTypeId', 'chainDepth', 'createdAt', 'updatedAt'],
+      required: ['noteId', 'modelName', 'deckName', 'tags', 'cardIds', 'modTimestamp'],
       additionalProperties: false,
       properties: {
-        draftId: { type: 'string' },
         noteId: { type: 'number' },
-        state: { enum: ['draft', 'superseded', 'committed', 'discarded'] },
-        cardTypeId: { type: 'string' },
-        supersedesDraftId: { type: 'string' },
-        chainDepth: { type: 'number' },
-        createdAt: { type: 'string' },
-        updatedAt: { type: 'string' },
+        modelName: { type: 'string' },
+        deckName: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        cardIds: { type: 'array', items: { type: 'number' } },
+        modTimestamp: { type: 'number' },
+      },
+    },
+    NoteRecord: {
+      allOf: [
+        { $ref: '#/sharedTypes/NoteSummary' },
+        {
+          type: 'object',
+          required: ['fields'],
+          additionalProperties: false,
+          properties: {
+            fields: { type: 'object', additionalProperties: { type: 'string' } },
+          },
+        },
+      ],
+    },
+    NoteReadResult: {
+      type: 'object',
+      required: ['noteId', 'ok'],
+      additionalProperties: false,
+      properties: {
+        noteId: { type: 'number' },
+        ok: { type: 'boolean' },
+        note: { $ref: '#/sharedTypes/NoteRecord' },
+        error: {
+          type: 'object',
+          required: ['code', 'message', 'retryable'],
+          additionalProperties: false,
+          properties: {
+            code: { type: 'string' },
+            message: { type: 'string' },
+            retryable: { type: 'boolean' },
+            hint: { type: 'string' },
+            context: { type: 'object' },
+          },
+        },
       },
     },
     NoteTypeSummary: {
@@ -199,124 +120,16 @@ export const TOOL_CONTRACTS_V1 = {
         isCloze: { type: 'boolean' },
       },
     },
-    StarterPackOptionDefinition: {
+    BatchSummary: {
       type: 'object',
-      required: ['name', 'type', 'required', 'description'],
+      required: ['succeeded', 'failed'],
       additionalProperties: false,
       properties: {
-        name: { type: 'string' },
-        type: { enum: ['string', 'string_array'] },
-        required: { type: 'boolean' },
-        description: { type: 'string' },
-        allowedValues: { type: 'array', items: { type: 'string' } },
-        defaultValue: {
-          oneOf: [
-            { type: 'string' },
-            { type: 'array', items: { type: 'string' } },
-          ],
-        },
+        succeeded: { type: 'number' },
+        failed: { type: 'number' },
       },
     },
-    StarterPackSummary: {
-      type: 'object',
-      required: ['packId', 'label', 'version', 'domains', 'supportedOptions', 'source'],
-      additionalProperties: false,
-      properties: {
-        packId: { type: 'string' },
-        label: { type: 'string' },
-        version: { type: 'string' },
-        domains: { type: 'array', items: { type: 'string' } },
-        supportedOptions: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackOptionDefinition' } },
-        source: { enum: ['builtin', 'custom'] },
-      },
-    },
-    StarterPackManifest: {
-      type: 'object',
-      required: ['packId', 'label', 'version', 'domains', 'supportedOptions', 'deckRoots', 'tagTemplates', 'noteTypes', 'cardTypes'],
-      additionalProperties: false,
-      properties: {
-        packId: { type: 'string' },
-        label: { type: 'string' },
-        version: { type: 'string' },
-        domains: { type: 'array', items: { type: 'string' } },
-        supportedOptions: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackOptionDefinition' } },
-        deckRoots: { type: 'array', items: { type: 'string' } },
-        tagTemplates: {
-          type: 'object',
-          additionalProperties: {
-            type: 'array',
-            items: { type: 'string' },
-          },
-        },
-        noteTypes: {
-          type: 'array',
-          items: {
-            type: 'object',
-            required: ['modelName', 'fields', 'templates'],
-            additionalProperties: false,
-            properties: {
-              modelName: { type: 'string' },
-              fields: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['name'],
-                  additionalProperties: false,
-                  properties: {
-                    name: { type: 'string' },
-                    description: { type: 'string' },
-                  },
-                },
-              },
-              templates: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['name', 'front', 'back'],
-                  additionalProperties: false,
-                  properties: {
-                    name: { type: 'string' },
-                    front: { type: 'string' },
-                    back: { type: 'string' },
-                  },
-                },
-              },
-              css: { type: 'string' },
-              isCloze: { type: 'boolean' },
-            },
-          },
-        },
-        cardTypes: { type: 'array', items: { $ref: '#/sharedTypes/CustomCardTypeDefinition' } },
-      },
-    },
-    CustomPackManifest: {
-      allOf: [
-        { $ref: '#/sharedTypes/StarterPackManifest' },
-        {
-          type: 'object',
-          required: ['source', 'profileId', 'status', 'updatedAt'],
-          additionalProperties: false,
-          properties: {
-            source: { const: 'custom' },
-            profileId: { type: 'string' },
-            status: { enum: ['active', 'deprecated'] },
-            updatedAt: { type: 'string' },
-            deprecatedAt: { type: 'string' },
-          },
-        },
-      ],
-    },
-    StarterPackOperation: {
-      type: 'object',
-      required: ['kind', 'id', 'status'],
-      additionalProperties: false,
-      properties: {
-        kind: { enum: ['note_type', 'card_type_definition', 'deck_root'] },
-        id: { type: 'string' },
-        status: { enum: ['create', 'update', 'unchanged'] },
-      },
-    },
-    ImportedMediaAsset: {
+    MediaAsset: {
       type: 'object',
       required: ['mediaKind', 'sha256', 'storedFilename', 'fieldValue', 'alreadyExisted'],
       additionalProperties: false,
@@ -330,21 +143,18 @@ export const TOOL_CONTRACTS_V1 = {
     },
   },
   tools: {
-    list_card_types: {
+    list_decks: {
       request: {
         type: 'object',
         additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-        },
+        properties: { profileId: { type: 'string' } },
       },
       response: {
         ...baseResponse,
-        required: [...baseResponse.required, 'catalogVersion', 'cardTypes'],
+        required: [...baseResponse.required, 'decks'],
         properties: {
           ...baseResponse.properties,
-          catalogVersion: { type: 'string' },
-          cardTypes: { type: 'array', items: { $ref: '#/sharedTypes/CardTypeSummary' } },
+          decks: { type: 'array', items: { $ref: '#/sharedTypes/DeckSummary' } },
         },
       },
     },
@@ -352,9 +162,7 @@ export const TOOL_CONTRACTS_V1 = {
       request: {
         type: 'object',
         additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-        },
+        properties: { profileId: { type: 'string' } },
       },
       response: {
         ...baseResponse,
@@ -365,69 +173,14 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
-    list_starter_packs: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'packCatalogVersion', 'packs'],
-        properties: {
-          ...baseResponse.properties,
-          packCatalogVersion: { type: 'string' },
-          packs: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackSummary' } },
-        },
-      },
-    },
-    list_pack_manifests: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-          includeDeprecated: { type: 'boolean' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'items'],
-        properties: {
-          ...baseResponse.properties,
-          items: { type: 'array', items: { $ref: '#/sharedTypes/CustomPackManifest' } },
-        },
-      },
-    },
-    get_pack_manifest: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['packId'],
-        properties: {
-          profileId: { type: 'string' },
-          packId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'pack'],
-        properties: {
-          ...baseResponse.properties,
-          pack: { $ref: '#/sharedTypes/CustomPackManifest' },
-        },
-      },
-    },
     get_note_type_schema: {
       request: {
         type: 'object',
-        additionalProperties: false,
         required: ['modelName'],
+        additionalProperties: false,
         properties: {
-          modelName: { type: 'string' },
           profileId: { type: 'string' },
+          modelName: { type: 'string' },
         },
       },
       response: {
@@ -439,16 +192,78 @@ export const TOOL_CONTRACTS_V1 = {
         },
       },
     },
-    upsert_note_type: {
+    search_notes: {
       request: {
         type: 'object',
         additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          query: { type: 'string' },
+          modelNames: { type: 'array', items: { type: 'string' } },
+          deckNames: { type: 'array', items: { type: 'string' } },
+          tags: { type: 'array', items: { type: 'string' } },
+          limit: { type: 'number' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'notes', 'query'],
+        properties: {
+          ...baseResponse.properties,
+          query: { type: 'string' },
+          notes: { type: 'array', items: { $ref: '#/sharedTypes/NoteSummary' } },
+        },
+      },
+    },
+    get_notes: {
+      request: {
+        type: 'object',
+        required: ['noteIds'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          noteIds: { type: 'array', items: { type: 'number' } },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'results'],
+        properties: {
+          ...baseResponse.properties,
+          results: { type: 'array', items: { $ref: '#/sharedTypes/NoteReadResult' } },
+        },
+      },
+    },
+    ensure_deck: {
+      request: {
+        type: 'object',
+        required: ['profileId', 'deckName'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          deckName: { type: 'string' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'deckName', 'created'],
+        properties: {
+          ...baseResponse.properties,
+          deckName: { type: 'string' },
+          created: { type: 'boolean' },
+        },
+      },
+    },
+    upsert_note_type: {
+      request: {
+        type: 'object',
         required: ['profileId', 'modelName', 'fields', 'templates'],
+        additionalProperties: false,
         properties: {
           profileId: { type: 'string' },
           modelName: { type: 'string' },
-          fields: { type: 'array' },
-          templates: { type: 'array' },
+          fields: { type: 'array', items: { type: 'object' } },
+          templates: { type: 'array', items: { type: 'object' } },
           css: { type: 'string' },
           isCloze: { type: 'boolean' },
           dryRun: { type: 'boolean' },
@@ -460,121 +275,233 @@ export const TOOL_CONTRACTS_V1 = {
         properties: {
           ...baseResponse.properties,
           dryRun: { type: 'boolean' },
-          result: { type: 'object' },
-        },
-      },
-    },
-    upsert_pack_manifest: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'manifest'],
-        properties: {
-          profileId: { type: 'string' },
-          manifest: { $ref: '#/sharedTypes/StarterPackManifest' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'status', 'pack'],
-        properties: {
-          ...baseResponse.properties,
-          status: { enum: ['created', 'updated'] },
-          pack: { $ref: '#/sharedTypes/CustomPackManifest' },
-        },
-      },
-    },
-    apply_starter_pack: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'packId'],
-        properties: {
-          profileId: { type: 'string' },
-          packId: { type: 'string' },
-          version: { type: 'string' },
-          dryRun: { type: 'boolean' },
-          options: {
-            type: 'object',
-            additionalProperties: {
-              oneOf: [
-                { type: 'string' },
-                { type: 'array', items: { type: 'string' } },
-              ],
-            },
-          },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'pack', 'dryRun', 'result'],
-        properties: {
-          ...baseResponse.properties,
-          pack: { $ref: '#/sharedTypes/StarterPackSummary' },
-          dryRun: { type: 'boolean' },
           result: {
             type: 'object',
-            required: ['status', 'deckRoots', 'tagTemplates', 'operations'],
+            required: ['status', 'operations', 'noteType'],
             additionalProperties: false,
             properties: {
-              status: { enum: ['planned', 'applied'] },
-              deckRoots: { type: 'array', items: { type: 'string' } },
-              tagTemplates: {
-                type: 'object',
-                additionalProperties: {
-                  type: 'array',
-                  items: { type: 'string' },
-                },
-              },
-              operations: { type: 'array', items: { $ref: '#/sharedTypes/StarterPackOperation' } },
+              status: { enum: ['planned', 'created', 'updated'] },
+              operations: { type: 'array', items: { type: 'object' } },
+              noteType: { $ref: '#/sharedTypes/NoteTypeSchema' },
             },
           },
         },
       },
     },
-    deprecate_pack_manifest: {
+    add_note: {
       request: {
         type: 'object',
+        required: ['profileId', 'deckName', 'modelName', 'fields'],
         additionalProperties: false,
-        required: ['profileId', 'packId'],
         properties: {
           profileId: { type: 'string' },
-          packId: { type: 'string' },
+          clientRequestId: { type: 'string' },
+          deckName: { type: 'string' },
+          modelName: { type: 'string' },
+          fields: { type: 'object', additionalProperties: { type: 'string' } },
+          tags: { type: 'array', items: { type: 'string' } },
+          suspendNewCards: { type: 'boolean' },
         },
       },
       response: {
         ...baseResponse,
-        required: [...baseResponse.required, 'pack'],
+        required: [...baseResponse.required, 'note', 'reviewPending'],
         properties: {
           ...baseResponse.properties,
-          pack: { $ref: '#/sharedTypes/CustomPackManifest' },
+          reviewPending: { type: 'boolean' },
+          note: { $ref: '#/sharedTypes/NoteRecord' },
+          idempotentReplay: { type: 'boolean' },
         },
       },
     },
-    upsert_card_type_definition: {
+    add_notes_batch: {
       request: {
         type: 'object',
+        required: ['profileId', 'items'],
         additionalProperties: false,
-        required: ['profileId', 'definition'],
         properties: {
           profileId: { type: 'string' },
-          definition: { type: 'object' },
+          items: { type: 'array', items: { type: 'object' } },
         },
       },
       response: {
         ...baseResponse,
-        required: [...baseResponse.required, 'cardType'],
+        required: [...baseResponse.required, 'summary', 'results'],
         properties: {
           ...baseResponse.properties,
-          cardType: { type: 'object' },
+          summary: { $ref: '#/sharedTypes/BatchSummary' },
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['itemId', 'ok'],
+              additionalProperties: false,
+              properties: {
+                itemId: { type: 'string' },
+                ok: { type: 'boolean' },
+                note: { $ref: '#/sharedTypes/NoteRecord' },
+                reviewPending: { type: 'boolean' },
+                error: {
+                  type: 'object',
+                  required: ['code', 'message', 'retryable'],
+                  additionalProperties: false,
+                  properties: {
+                    code: { type: 'string' },
+                    message: { type: 'string' },
+                    retryable: { type: 'boolean' },
+                    hint: { type: 'string' },
+                    context: { type: 'object' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    update_note: {
+      request: {
+        type: 'object',
+        required: ['profileId', 'noteId', 'expectedModTimestamp'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          noteId: { type: 'number' },
+          expectedModTimestamp: { type: 'number' },
+          fields: { type: 'object', additionalProperties: { type: 'string' } },
+          tags: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'note'],
+        properties: {
+          ...baseResponse.properties,
+          note: { $ref: '#/sharedTypes/NoteRecord' },
+        },
+      },
+    },
+    delete_note: {
+      request: {
+        type: 'object',
+        required: ['profileId', 'noteId'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          noteId: { type: 'number' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'noteId', 'status'],
+        properties: {
+          ...baseResponse.properties,
+          noteId: { type: 'number' },
+          status: { enum: ['deleted', 'already_deleted'] },
+        },
+      },
+    },
+    delete_notes_batch: {
+      request: {
+        type: 'object',
+        required: ['profileId', 'items'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          items: { type: 'array', items: { type: 'object' } },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'summary', 'results'],
+        properties: {
+          ...baseResponse.properties,
+          summary: { $ref: '#/sharedTypes/BatchSummary' },
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['itemId', 'ok'],
+              additionalProperties: false,
+              properties: {
+                itemId: { type: 'string' },
+                ok: { type: 'boolean' },
+                noteId: { type: 'number' },
+                status: { enum: ['deleted', 'already_deleted'] },
+                error: {
+                  type: 'object',
+                  required: ['code', 'message', 'retryable'],
+                  additionalProperties: false,
+                  properties: {
+                    code: { type: 'string' },
+                    message: { type: 'string' },
+                    retryable: { type: 'boolean' },
+                    hint: { type: 'string' },
+                    context: { type: 'object' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    open_note_preview: {
+      request: {
+        type: 'object',
+        required: ['noteId'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          noteId: { type: 'number' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'noteId', 'preview'],
+        properties: {
+          ...baseResponse.properties,
+          noteId: { type: 'number' },
+          preview: {
+            type: 'object',
+            required: ['opened', 'browserQuery', 'selectedCardIds'],
+            additionalProperties: false,
+            properties: {
+              opened: { type: 'boolean' },
+              browserQuery: { type: 'string' },
+              selectedCardIds: { type: 'array', items: { type: 'number' } },
+            },
+          },
+        },
+      },
+    },
+    set_note_cards_suspended: {
+      request: {
+        type: 'object',
+        required: ['profileId', 'noteId', 'suspended'],
+        additionalProperties: false,
+        properties: {
+          profileId: { type: 'string' },
+          noteId: { type: 'number' },
+          suspended: { type: 'boolean' },
+        },
+      },
+      response: {
+        ...baseResponse,
+        required: [...baseResponse.required, 'noteId', 'cardIds', 'suspended'],
+        properties: {
+          ...baseResponse.properties,
+          noteId: { type: 'number' },
+          cardIds: { type: 'array', items: { type: 'number' } },
+          suspended: { type: 'boolean' },
         },
       },
     },
     import_media_asset: {
       request: {
         type: 'object',
-        additionalProperties: false,
         required: ['profileId', 'localPath'],
+        additionalProperties: false,
         properties: {
           profileId: { type: 'string' },
           localPath: { type: 'string' },
@@ -587,297 +514,7 @@ export const TOOL_CONTRACTS_V1 = {
         required: [...baseResponse.required, 'asset'],
         properties: {
           ...baseResponse.properties,
-          asset: { $ref: '#/sharedTypes/ImportedMediaAsset' },
-        },
-      },
-    },
-    list_card_type_definitions: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-          includeDeprecated: { type: 'boolean' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'items'],
-        properties: {
-          ...baseResponse.properties,
-          items: { type: 'array', items: { $ref: '#/sharedTypes/CustomCardTypeDefinition' } },
-        },
-      },
-    },
-    deprecate_card_type_definition: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'cardTypeId'],
-        properties: {
-          profileId: { type: 'string' },
-          cardTypeId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'cardType'],
-        properties: {
-          ...baseResponse.properties,
-          cardType: { $ref: '#/sharedTypes/CustomCardTypeDefinition' },
-        },
-      },
-    },
-    get_card_type_schema: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['cardTypeId'],
-        properties: {
-          cardTypeId: { type: 'string' },
-          profileId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'catalogVersion', 'cardType', 'fields'],
-        properties: {
-          ...baseResponse.properties,
-          catalogVersion: { type: 'string' },
-          cardType: { $ref: '#/sharedTypes/CardTypeSummary' },
-          fields: { type: 'array', items: { $ref: '#/sharedTypes/FieldSchema' } },
-        },
-      },
-    },
-    create_draft: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['cardTypeId', 'profileId', 'clientRequestId', 'fields'],
-        properties: {
-          cardTypeId: { type: 'string' },
-          profileId: { type: 'string' },
-          clientRequestId: { type: 'string' },
-          fields: { type: 'object', additionalProperties: { type: 'string' } },
-          deckName: { type: 'string' },
-          tags: { type: 'array', items: { type: 'string' } },
-          supersedesDraftId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'draft'],
-        properties: {
-          ...baseResponse.properties,
-          draft: { $ref: '#/sharedTypes/DraftRecord' },
-        },
-      },
-    },
-    create_drafts_batch: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'items'],
-        properties: {
-          profileId: { type: 'string' },
-          items: { type: 'array' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'summary', 'results'],
-        properties: {
-          ...baseResponse.properties,
-          summary: {
-            type: 'object',
-            required: ['succeeded', 'failed'],
-            additionalProperties: false,
-            properties: {
-              succeeded: { type: 'number' },
-              failed: { type: 'number' },
-            },
-          },
-          results: { type: 'array' },
-        },
-      },
-    },
-    get_draft: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['draftId'],
-        properties: {
-          draftId: { type: 'string' },
-          profileId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'draft', 'cardType'],
-        properties: {
-          ...baseResponse.properties,
-          draft: { $ref: '#/sharedTypes/DraftRecord' },
-          cardType: { $ref: '#/sharedTypes/CardTypeSummary' },
-        },
-      },
-    },
-    open_draft_preview: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['draftId'],
-        properties: {
-          draftId: { type: 'string' },
-          profileId: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'draftId', 'preview'],
-        properties: {
-          ...baseResponse.properties,
-          draftId: { type: 'string' },
-          preview: { type: 'object' },
-        },
-      },
-    },
-    commit_draft: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['draftId', 'profileId', 'reviewDecision'],
-        properties: {
-          draftId: { type: 'string' },
-          profileId: { type: 'string' },
-          reviewDecision: { type: 'object' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'result'],
-        properties: {
-          ...baseResponse.properties,
-          result: { type: 'object' },
-        },
-      },
-    },
-    commit_drafts_batch: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'items'],
-        properties: {
-          profileId: { type: 'string' },
-          items: { type: 'array' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'summary', 'results'],
-        properties: {
-          ...baseResponse.properties,
-          summary: {
-            type: 'object',
-            required: ['succeeded', 'failed'],
-            additionalProperties: false,
-            properties: {
-              succeeded: { type: 'number' },
-              failed: { type: 'number' },
-            },
-          },
-          results: { type: 'array' },
-        },
-      },
-    },
-    discard_draft: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['draftId', 'profileId'],
-        properties: {
-          draftId: { type: 'string' },
-          profileId: { type: 'string' },
-          reason: { enum: ['user_request', 'cleanup', 'superseded', 'conflict_recovery'] },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'result'],
-        properties: {
-          ...baseResponse.properties,
-          result: { type: 'object' },
-        },
-      },
-    },
-    discard_drafts_batch: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId', 'items'],
-        properties: {
-          profileId: { type: 'string' },
-          items: { type: 'array' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'summary', 'results'],
-        properties: {
-          ...baseResponse.properties,
-          summary: {
-            type: 'object',
-            required: ['succeeded', 'failed'],
-            additionalProperties: false,
-            properties: {
-              succeeded: { type: 'number' },
-              failed: { type: 'number' },
-            },
-          },
-          results: { type: 'array' },
-        },
-      },
-    },
-    list_drafts: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          profileId: { type: 'string' },
-          states: { type: 'array', items: { enum: ['draft', 'superseded', 'committed', 'discarded'] } },
-          limit: { type: 'number' },
-          cursor: { type: 'string' },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'items'],
-        properties: {
-          ...baseResponse.properties,
-          items: { type: 'array', items: { $ref: '#/sharedTypes/DraftListItem' } },
-          nextCursor: { type: 'string' },
-        },
-      },
-    },
-    cleanup_drafts: {
-      request: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['profileId'],
-        properties: {
-          profileId: { type: 'string' },
-          olderThanHours: { type: 'number' },
-          states: { type: 'array', items: { enum: ['draft', 'superseded'] } },
-        },
-      },
-      response: {
-        ...baseResponse,
-        required: [...baseResponse.required, 'olderThanHours', 'deletedCount', 'deletedDraftIds', 'executedAt'],
-        properties: {
-          ...baseResponse.properties,
-          olderThanHours: { type: 'number' },
-          deletedCount: { type: 'number' },
-          deletedDraftIds: { type: 'array', items: { type: 'string' } },
-          executedAt: { type: 'string' },
+          asset: { $ref: '#/sharedTypes/MediaAsset' },
         },
       },
     },

@@ -1,31 +1,36 @@
 # Card Operations
 
-## 1. Create one draft
+## 1. Add one review-pending note
 
 Example user request:
-- "Add one TypeScript concept card about `any` vs `unknown`."
+
+- "TypeScript の `any` と `unknown` の違いについて 1 枚追加してください。"
 
 Recommended sequence:
-1. `get_card_type_schema`
-2. `create_draft`
-3. `get_draft`
-4. `open_draft_preview`
-5. Wait for explicit approval
-6. `commit_draft` or `discard_draft`
 
-Example create payload:
+1. `get_note_type_schema`
+2. `ensure_deck`
+3. `add_note`
+4. `open_note_preview`
+5. Wait for explicit approval
+6. `update_note`, `delete_note`, or `set_note_cards_suspended(suspended=false)`
+
+Example payload:
+
 ```json
 {
-  "name": "create_draft",
+  "name": "add_note",
   "arguments": {
-    "profileId": "y@m@ちゃん",
+    "profileId": "your-profile",
     "clientRequestId": "ts-concept-any-vs-unknown-001",
-    "cardTypeId": "programming.v1.ts-concept",
+    "deckName": "Programming::TypeScript::Concept",
+    "modelName": "ts.v1.concept",
     "fields": {
       "Prompt": "`any` と `unknown` の違いは何ですか？",
       "Answer": "`unknown` は利用前に型の絞り込みが必要です。",
       "DetailedExplanation": "`any` は型検査を迂回しますが、`unknown` は安全側に倒れます。"
-    }
+    },
+    "tags": ["language::typescript", "card::concept"]
   }
 }
 ```
@@ -35,61 +40,62 @@ Example create payload:
 Use when the user says "ここを変更してください" after preview.
 
 Pattern:
-1. `get_draft`
-2. build corrected fields
-3. call `create_draft` with a new `clientRequestId` and `supersedesDraftId`
-4. preview the new draft
-5. commit only the latest draft
+
+1. `get_notes`
+2. build corrected fields or tags
+3. call `update_note` with the current `expectedModTimestamp`
+4. preview again if visual confirmation is needed
+5. only after approval, `set_note_cards_suspended(suspended=false)`
 
 Example correction payload:
+
 ```json
 {
-  "name": "create_draft",
+  "name": "update_note",
   "arguments": {
-    "profileId": "y@m@ちゃん",
-    "clientRequestId": "ts-concept-any-vs-unknown-002",
-    "cardTypeId": "programming.v1.ts-concept",
-    "supersedesDraftId": "old-draft-id",
+    "profileId": "your-profile",
+    "noteId": 1234567890,
+    "expectedModTimestamp": 1730000000,
     "fields": {
-      "Prompt": "`any` と `unknown` の違いを説明してください。",
       "Answer": "`unknown` は安全で、使う前に絞り込みが必要です。"
-    }
+    },
+    "tags": ["language::typescript", "reviewed"]
   }
 }
 ```
 
-## 3. Create cards in batch
+## 3. Add notes in batch
 
 Example user request:
+
 - "TypeScript output prediction cardsを3枚追加してください。"
 
 Example batch payload:
+
 ```json
 {
-  "name": "create_drafts_batch",
+  "name": "add_notes_batch",
   "arguments": {
-    "profileId": "y@m@ちゃん",
+    "profileId": "your-profile",
     "items": [
       {
         "itemId": "ts-output-1",
         "clientRequestId": "ts-output-1-v1",
-        "cardTypeId": "programming.v1.ts-output",
+        "deckName": "Programming::TypeScript::Output",
+        "modelName": "ts.v1.output",
         "fields": {
           "Code": "const x: string | number = 1;\nif (typeof x === 'number') console.log(x + 1);",
-          "Question": "出力は何ですか？",
-          "Expected": "2",
-          "Reason": "`typeof x === 'number'` で narrowing されます。"
+          "Expected": "2"
         }
       },
       {
         "itemId": "ts-output-2",
         "clientRequestId": "ts-output-2-v1",
-        "cardTypeId": "programming.v1.ts-output",
+        "deckName": "Programming::TypeScript::Output",
+        "modelName": "ts.v1.output",
         "fields": {
           "Code": "console.log(typeof null);",
-          "Question": "出力は何ですか？",
-          "Expected": "object",
-          "Reason": "JavaScript の歴史的仕様です。"
+          "Expected": "object"
         }
       }
     ]
@@ -97,15 +103,16 @@ Example batch payload:
 }
 ```
 
-Batch finalize example:
+Batch delete example:
+
 ```json
 {
-  "name": "discard_drafts_batch",
+  "name": "delete_notes_batch",
   "arguments": {
-    "profileId": "y@m@ちゃん",
+    "profileId": "your-profile",
     "items": [
-      { "itemId": "ts-output-1", "draftId": "draft-1", "reason": "user_request" },
-      { "itemId": "ts-output-2", "draftId": "draft-2", "reason": "user_request" }
+      { "itemId": "ts-output-1", "noteId": 1234567890 },
+      { "itemId": "ts-output-2", "noteId": 1234567891 }
     ]
   }
 }
@@ -114,11 +121,8 @@ Batch finalize example:
 ## 4. Recover after interruption
 
 Sequence:
-1. `list_drafts`
-2. `get_draft`
-3. `open_draft_preview` if visual confirmation is still needed
-4. `commit_draft`, `discard_draft`, or `cleanup_drafts`
 
-Rule:
-- Prefer explicit discard for known drafts.
-- Use cleanup only for stale leftovers.
+1. `search_notes`
+2. `get_notes`
+3. `open_note_preview` if visual confirmation is still needed
+4. `update_note`, `delete_note`, or `set_note_cards_suspended`

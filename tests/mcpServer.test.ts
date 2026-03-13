@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { rmSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createRuntime } from '../src/server.js';
@@ -15,18 +14,15 @@ type RuntimeContext = {
 
 afterEach(() => {
   delete process.env.ANKI_GATEWAY_MODE;
+  delete process.env.ANKI_MCPS_DB_PATH;
   delete process.env.DRAFT_DB_PATH;
   delete process.env.ANKI_ACTIVE_PROFILE;
-  try {
-    rmSync(dbPath, { force: true });
-  } catch {
-    // ignore
-  }
+  rmSync(dbPath, { force: true });
 });
 
 async function createConnectedContext(): Promise<RuntimeContext> {
   process.env.ANKI_GATEWAY_MODE = 'memory';
-  process.env.DRAFT_DB_PATH = dbPath;
+  process.env.ANKI_MCPS_DB_PATH = dbPath;
   process.env.ANKI_ACTIVE_PROFILE = 'default';
 
   const runtime = createRuntime();
@@ -53,123 +49,81 @@ async function closeContext(context: RuntimeContext) {
   context.runtime.store.close();
 }
 
-function buildCustomPackManifest() {
-  return {
-    packId: 'custom.lang.ja-core',
-    label: 'Japanese Core',
-    version: '2026-03-12.v1',
-    domains: ['japanese'],
-    supportedOptions: [
-      {
-        name: 'deckRoot',
-        type: 'string',
-        required: false,
-        description: 'Deck root',
-        defaultValue: 'Languages::Japanese',
-      },
-    ],
-    deckRoots: ['Languages::Japanese'],
-    tagTemplates: {
-      'language.v1.japanese-vocab': ['domain::japanese', 'skill::vocabulary'],
-    },
-    noteTypes: [
-      {
-        modelName: 'language.v1.japanese-vocab',
-        fields: [{ name: 'Expression' }, { name: 'Meaning' }],
-        templates: [
-          {
-            name: 'Card 1',
-            front: '<div>{{Expression}}</div>',
-            back: '{{FrontSide}}<hr id="answer"><div>{{Meaning}}</div>',
-          },
-        ],
-        css: '.card { color: white; background: black; }',
-      },
-    ],
-    cardTypes: [
-      {
-        cardTypeId: 'language.v1.japanese-vocab',
-        label: 'Japanese Vocabulary',
-        modelName: 'language.v1.japanese-vocab',
-        defaultDeck: 'Languages::Japanese::Vocabulary',
-        source: 'custom',
-        requiredFields: ['Expression', 'Meaning'],
-        optionalFields: [],
-        renderIntent: 'recognition',
-        allowedHtmlPolicy: 'safe_inline_html',
-        fields: [
-          { name: 'Expression', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-          { name: 'Meaning', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html', multiline: true },
-        ],
-      },
-    ],
-  };
-}
-
 describe('MCP server', () => {
-  it('exposes tool annotations for read/write boundaries', async () => {
+  it('exposes note-centric tools with correct read/write annotations', async () => {
     const context = await createConnectedContext();
 
     try {
       const listed = await context.client.listTools();
       const byName = new Map(listed.tools.map((tool) => [tool.name, tool]));
 
-      expect(byName.get('list_note_types')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('upsert_note_type')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('discard_draft')?.annotations?.destructiveHint).toBe(true);
-      expect(byName.get('get_draft')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('create_drafts_batch')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('list_starter_packs')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('apply_starter_pack')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('list_pack_manifests')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('get_pack_manifest')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('upsert_pack_manifest')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('deprecate_pack_manifest')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('import_media_asset')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('list_decks')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('search_notes')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('get_notes')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('open_note_preview')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('ensure_deck')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('add_note')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('update_note')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('set_note_cards_suspended')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('delete_note')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('delete_notes_batch')?.annotations?.destructiveHint).toBe(true);
+
+      expect(byName.has('create_draft')).toBe(false);
+      expect(byName.has('list_starter_packs')).toBe(false);
+      expect(byName.has('upsert_card_type_definition')).toBe(false);
+      expect(byName.has('list_pack_manifests')).toBe(false);
     } finally {
       await closeContext(context);
     }
   });
 
-  it('serves contracts and card-type catalog resources', async () => {
+  it('serves only the note-centric contracts resource', async () => {
     const context = await createConnectedContext();
 
     try {
       const resources = await context.client.listResources();
       const uris = resources.resources.map((resource) => resource.uri);
+
       expect(uris).toContain('anki://contracts/v1/tools');
-      expect(uris).toContain('anki://catalog/card-types');
-      expect(uris).toContain('anki://starter-packs/catalog');
+      expect(uris).not.toContain('anki://catalog/card-types');
+      expect(uris).not.toContain('anki://starter-packs/catalog');
 
       const contracts = await context.client.readResource({ uri: 'anki://contracts/v1/tools' });
       const payload = JSON.parse((contracts.contents[0] as { text: string }).text) as {
         tools?: Record<string, unknown>;
         sharedTypes?: Record<string, unknown>;
       };
+
       expect(payload).toHaveProperty('contractVersion', '1.0.0');
-      expect(payload.tools).toHaveProperty('upsert_note_type');
-      expect(payload.tools).toHaveProperty('upsert_card_type_definition');
-      expect(payload.tools).toHaveProperty('commit_draft');
-      expect(payload.tools).toHaveProperty('get_draft');
-      expect(payload.tools).toHaveProperty('create_drafts_batch');
-      expect(payload.tools).toHaveProperty('list_card_type_definitions');
-      expect(payload.tools).toHaveProperty('list_starter_packs');
-      expect(payload.tools).toHaveProperty('apply_starter_pack');
-      expect(payload.tools).toHaveProperty('list_pack_manifests');
-      expect(payload.tools).toHaveProperty('get_pack_manifest');
-      expect(payload.tools).toHaveProperty('upsert_pack_manifest');
-      expect(payload.tools).toHaveProperty('deprecate_pack_manifest');
-      expect(payload.tools).toHaveProperty('import_media_asset');
-      expect(payload.sharedTypes).toHaveProperty('CustomPackManifest');
+      expect(payload.tools).toHaveProperty('list_decks');
+      expect(payload.tools).toHaveProperty('search_notes');
+      expect(payload.tools).toHaveProperty('add_note');
+      expect(payload.tools).toHaveProperty('update_note');
+      expect(payload.tools).toHaveProperty('delete_note');
+      expect(payload.tools).toHaveProperty('set_note_cards_suspended');
+      expect(payload.tools).not.toHaveProperty('create_draft');
+      expect(payload.tools).not.toHaveProperty('apply_starter_pack');
+      expect(payload.tools).not.toHaveProperty('upsert_card_type_definition');
+      expect(payload.sharedTypes).toHaveProperty('NoteRecord');
+      expect(payload.sharedTypes).toHaveProperty('DeckSummary');
     } finally {
       await closeContext(context);
     }
   });
 
-  it('executes note-type authoring and draft creation through MCP tools', async () => {
+  it('executes the note-centric review workflow through MCP tools', async () => {
     const context = await createConnectedContext();
 
     try {
+      const ensured = parseToolResult(await context.client.callTool({
+        name: 'ensure_deck',
+        arguments: {
+          profileId: 'default',
+          deckName: 'Programming::TypeScript::Concept',
+        },
+      }));
+      expect(ensured.created).toBe(true);
+
       const upsertNoteType = parseToolResult(await context.client.callTool({
         name: 'upsert_note_type',
         arguments: {
@@ -191,426 +145,199 @@ describe('MCP server', () => {
           css: '.card { color: white; background: black; }',
         },
       }));
-
       expect(upsertNoteType.result.status).toBe('created');
 
-      const upsertCardType = parseToolResult(await context.client.callTool({
-        name: 'upsert_card_type_definition',
-        arguments: {
-          profileId: 'default',
-          definition: {
-            cardTypeId: 'programming.v1.ts-concept',
-            label: 'TypeScript Concept',
-            modelName: 'ts.v1.concept',
-            defaultDeck: 'Programming::TypeScript::Concept',
-            requiredFields: ['Prompt', 'Answer'],
-            optionalFields: ['DetailedExplanation'],
-            renderIntent: 'production',
-            allowedHtmlPolicy: 'safe_inline_html',
-            fields: [
-              { name: 'Prompt', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-              { name: 'Answer', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-              { name: 'DetailedExplanation', required: false, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html', multiline: true },
-            ],
-          },
-        },
-      }));
-
-      expect(upsertCardType.cardType.cardTypeId).toBe('programming.v1.ts-concept');
-
-      const draft = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
+      const added = parseToolResult(await context.client.callTool({
+        name: 'add_note',
         arguments: {
           profileId: 'default',
           clientRequestId: 'mcp-server-test-1',
-          cardTypeId: 'programming.v1.ts-concept',
+          deckName: 'Programming::TypeScript::Concept',
+          modelName: 'ts.v1.concept',
           fields: {
             Prompt: 'any と unknown の違いは？',
-            Answer: 'unknown は絞り込みが必要。',
-            DetailedExplanation: '追加説明',
+            Answer: 'unknown は絞り込みが必要です。',
+            DetailedExplanation: '安全に使うには型を狭めます。',
           },
+          tags: ['language::typescript', 'card::concept'],
         },
       }));
 
-      expect(draft.draft.cardTypeId).toBe('programming.v1.ts-concept');
-      expect(draft.draft.deckName).toBe('Programming::TypeScript::Concept');
+      expect(added.reviewPending).toBe(true);
+      expect(added.note.deckName).toBe('Programming::TypeScript::Concept');
+      expect(added.note.tags).toEqual(['card::concept', 'language::typescript']);
 
       const preview = parseToolResult(await context.client.callTool({
-        name: 'open_draft_preview',
+        name: 'open_note_preview',
         arguments: {
           profileId: 'default',
-          draftId: draft.draft.draftId,
+          noteId: added.note.noteId,
         },
       }));
-
       expect(preview.preview.opened).toBe(true);
-      expect(preview.preview.selectedNoteId).toBe(draft.draft.noteId);
-    } finally {
-      await closeContext(context);
-    }
-  });
 
-  it('returns structured MCP errors for invalid arguments and profile mismatches', async () => {
-    const context = await createConnectedContext();
-
-    try {
-      const invalid = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
+      const inspected = parseToolResult(await context.client.callTool({
+        name: 'get_notes',
         arguments: {
           profileId: 'default',
-          clientRequestId: 'mcp-server-test-invalid',
-          cardTypeId: 'language.v1.basic-bilingual',
-          fields: { Front: 'missing-back' },
+          noteIds: [added.note.noteId],
         },
       }));
+      expect(inspected.results[0].ok).toBe(true);
+      expect(inspected.results[0].note.fields.Prompt).toContain('any');
 
-      expect(invalid.code).toBe('INVALID_ARGUMENT');
-      expect(invalid.retryable).toBe(false);
-
-      const draft = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
-        arguments: {
-          profileId: 'profile-a',
-          clientRequestId: 'mcp-server-test-profile',
-          cardTypeId: 'language.v1.basic-bilingual',
-          fields: { Front: 'x', Back: 'y' },
-        },
-      }));
-
-      const mismatch = parseToolResult(await context.client.callTool({
-        name: 'commit_draft',
-        arguments: {
-          profileId: 'profile-b',
-          draftId: draft.draft.draftId,
-          reviewDecision: {
-            targetIdentityMatched: true,
-            questionConfirmed: true,
-            answerConfirmed: true,
-            reviewedAt: new Date().toISOString(),
-            reviewer: 'user',
-          },
-        },
-      }));
-
-      expect(mismatch.code).toBe('PROFILE_SCOPE_MISMATCH');
-      expect(mismatch.retryable).toBe(false);
-    } finally {
-      await closeContext(context);
-    }
-  });
-
-  it('provisions starter packs, imports media, and creates domain drafts through MCP tools', async () => {
-    const context = await createConnectedContext();
-    const tempDir = mkdtempSync(join(tmpdir(), 'anki-mcps-mcp-'));
-    const audioPath = join(tempDir, 'clip.mp3');
-    writeFileSync(audioPath, Buffer.from('clip-data'));
-
-    try {
-      const packs = parseToolResult(await context.client.callTool({
-        name: 'list_starter_packs',
-        arguments: { profileId: 'default' },
-      }));
-
-      expect(packs.packs.some((item: { packId: string }) => item.packId === 'english-core')).toBe(true);
-
-      const apply = parseToolResult(await context.client.callTool({
-        name: 'apply_starter_pack',
+      const searched = parseToolResult(await context.client.callTool({
+        name: 'search_notes',
         arguments: {
           profileId: 'default',
-          packId: 'english-core',
-          dryRun: false,
+          deckNames: ['Programming::TypeScript::Concept'],
+          modelNames: ['ts.v1.concept'],
         },
       }));
+      expect(searched.notes.map((note: { noteId: number }) => note.noteId)).toContain(added.note.noteId);
 
-      expect(apply.result.operations.some((operation: { id: string }) => operation.id === 'language.v1.vocab-recognition')).toBe(true);
-
-      const media = parseToolResult(await context.client.callTool({
-        name: 'import_media_asset',
+      const updated = parseToolResult(await context.client.callTool({
+        name: 'update_note',
         arguments: {
           profileId: 'default',
-          localPath: audioPath,
-        },
-      }));
-
-      expect(media.asset.fieldValue).toMatch(/^\[sound:/);
-
-      const draft = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
-        arguments: {
-          profileId: 'default',
-          clientRequestId: 'english-listening-001',
-          cardTypeId: 'language.v1.english-listening-comprehension',
+          noteId: added.note.noteId,
+          expectedModTimestamp: added.note.modTimestamp,
           fields: {
-            Audio: media.asset.fieldValue,
-            Prompt: '何が聞こえますか？',
-            Answer: 'hello',
-            Transcript: 'hello',
+            DetailedExplanation: 'unknown はそのまま使えず、型チェック後に利用します。',
           },
+          tags: ['language::typescript', 'reviewed'],
         },
       }));
+      expect(updated.note.fields.DetailedExplanation).toContain('型チェック');
+      expect(updated.note.tags).toEqual(['language::typescript', 'reviewed']);
 
-      expect(draft.draft.cardTypeId).toBe('language.v1.english-listening-comprehension');
-
-      const preview = parseToolResult(await context.client.callTool({
-        name: 'open_draft_preview',
-        arguments: { profileId: 'default', draftId: draft.draft.draftId },
-      }));
-
-      expect(preview.preview.opened).toBe(true);
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true });
-      await closeContext(context);
-    }
-  });
-
-  it('executes programming and fundamentals starter-pack flows through finalize', async () => {
-    const context = await createConnectedContext();
-
-    try {
-      parseToolResult(await context.client.callTool({
-        name: 'apply_starter_pack',
+      const released = parseToolResult(await context.client.callTool({
+        name: 'set_note_cards_suspended',
         arguments: {
           profileId: 'default',
-          packId: 'programming-core',
-          dryRun: false,
-          options: { languages: ['typescript'] },
+          noteId: added.note.noteId,
+          suspended: false,
         },
       }));
+      expect(released.suspended).toBe(false);
+      expect(released.cardIds).toEqual(added.note.cardIds);
 
-      const programmingDraft = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
+      const deleted = parseToolResult(await context.client.callTool({
+        name: 'delete_note',
         arguments: {
           profileId: 'default',
-          clientRequestId: 'programming-output-001',
-          cardTypeId: 'programming.v1.typescript-output',
-          fields: {
-            Code: 'const answer = 40 + 2;\\nconsole.log(answer);',
-            Question: 'What is logged?',
-            Expected: '42',
-            Reason: 'The numeric addition is evaluated before logging.',
-          },
+          noteId: added.note.noteId,
         },
       }));
+      expect(deleted.status).toBe('deleted');
 
-      const programmingPreview = parseToolResult(await context.client.callTool({
-        name: 'open_draft_preview',
-        arguments: { profileId: 'default', draftId: programmingDraft.draft.draftId },
-      }));
-      expect(programmingPreview.preview.opened).toBe(true);
-
-      const programmingDiscard = parseToolResult(await context.client.callTool({
-        name: 'discard_draft',
+      const deletedAgain = parseToolResult(await context.client.callTool({
+        name: 'delete_note',
         arguments: {
           profileId: 'default',
-          draftId: programmingDraft.draft.draftId,
-          reason: 'user_request',
+          noteId: added.note.noteId,
         },
       }));
-      expect(programmingDiscard.result.status).toBe('discarded');
-
-      parseToolResult(await context.client.callTool({
-        name: 'apply_starter_pack',
-        arguments: {
-          profileId: 'default',
-          packId: 'fundamentals-core',
-          dryRun: false,
-        },
-      }));
-
-      const fundamentalsDraft = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
-        arguments: {
-          profileId: 'default',
-          clientRequestId: 'fundamentals-cloze-001',
-          cardTypeId: 'fundamentals.v1.cloze',
-          fields: {
-            Text: 'TCP uses {{c1::three-way handshake}} to establish a connection.',
-            Extra: 'SYN -> SYN/ACK -> ACK',
-          },
-        },
-      }));
-
-      const fundamentalsPreview = parseToolResult(await context.client.callTool({
-        name: 'open_draft_preview',
-        arguments: { profileId: 'default', draftId: fundamentalsDraft.draft.draftId },
-      }));
-      expect(fundamentalsPreview.preview.opened).toBe(true);
-
-      const fundamentalsDiscard = parseToolResult(await context.client.callTool({
-        name: 'discard_draft',
-        arguments: {
-          profileId: 'default',
-          draftId: fundamentalsDraft.draft.draftId,
-          reason: 'user_request',
-        },
-      }));
-      expect(fundamentalsDiscard.result.status).toBe('discarded');
+      expect(deletedAgain.status).toBe('already_deleted');
     } finally {
       await closeContext(context);
     }
   });
 
-  it('registers, inspects, applies, and deprecates custom packs through MCP tools', async () => {
+  it('supports batch add/delete with mixed outcomes', async () => {
     const context = await createConnectedContext();
 
     try {
-      const upsert = parseToolResult(await context.client.callTool({
-        name: 'upsert_pack_manifest',
+      await context.client.callTool({
+        name: 'ensure_deck',
         arguments: {
           profileId: 'default',
-          manifest: buildCustomPackManifest(),
+          deckName: 'Programming::TypeScript::Output',
         },
-      }));
+      });
 
-      expect(upsert.pack.packId).toBe('custom.lang.ja-core');
-      expect(upsert.status).toBe('created');
-
-      const listedCustom = parseToolResult(await context.client.callTool({
-        name: 'list_pack_manifests',
-        arguments: { profileId: 'default' },
-      }));
-      expect(listedCustom.items.map((item: { packId: string }) => item.packId)).toEqual(['custom.lang.ja-core']);
-
-      const fetched = parseToolResult(await context.client.callTool({
-        name: 'get_pack_manifest',
-        arguments: { profileId: 'default', packId: 'custom.lang.ja-core' },
-      }));
-      expect(fetched.pack.source).toBe('custom');
-
-      const starterCatalog = parseToolResult(await context.client.callTool({
-        name: 'list_starter_packs',
-        arguments: { profileId: 'default' },
-      }));
-      expect(starterCatalog.packs.some((item: { packId: string; source: string }) => item.packId === 'custom.lang.ja-core' && item.source === 'custom')).toBe(true);
-
-      const apply = parseToolResult(await context.client.callTool({
-        name: 'apply_starter_pack',
+      await context.client.callTool({
+        name: 'upsert_note_type',
         arguments: {
           profileId: 'default',
-          packId: 'custom.lang.ja-core',
+          modelName: 'ts.v1.output',
           dryRun: false,
+          fields: [{ name: 'Code' }, { name: 'Expected' }],
+          templates: [{
+            name: 'Card 1',
+            front: '<pre>{{Code}}</pre>',
+            back: '{{FrontSide}}<hr id="answer"><div>{{Expected}}</div>',
+          }],
         },
-      }));
-      expect(apply.result.operations.some((operation: { id: string }) => operation.id === 'language.v1.japanese-vocab')).toBe(true);
+      });
 
-      const deprecated = parseToolResult(await context.client.callTool({
-        name: 'deprecate_pack_manifest',
-        arguments: { profileId: 'default', packId: 'custom.lang.ja-core' },
-      }));
-      expect(deprecated.pack.status).toBe('deprecated');
-
-      const relisted = parseToolResult(await context.client.callTool({
-        name: 'list_starter_packs',
-        arguments: { profileId: 'default' },
-      }));
-      expect(relisted.packs.some((item: { packId: string }) => item.packId === 'custom.lang.ja-core')).toBe(false);
-    } finally {
-      await closeContext(context);
-    }
-  });
-
-  it('executes card-type lifecycle, draft inspection, and batch flows through MCP tools', async () => {
-    const context = await createConnectedContext();
-
-    try {
-      const custom = parseToolResult(await context.client.callTool({
-        name: 'upsert_card_type_definition',
-        arguments: {
-          profileId: 'default',
-          definition: {
-            cardTypeId: 'programming.v1.ts-output',
-            label: 'TypeScript Output',
-            modelName: 'Basic',
-            defaultDeck: 'Programming::TypeScript::Output',
-            requiredFields: ['Front', 'Back'],
-            optionalFields: [],
-            renderIntent: 'production',
-            allowedHtmlPolicy: 'safe_inline_html',
-            fields: [
-              { name: 'Front', required: true, type: 'text', allowedHtmlPolicy: 'safe_inline_html' },
-              { name: 'Back', required: true, type: 'markdown', allowedHtmlPolicy: 'safe_inline_html' },
-            ],
-          },
-        },
-      }));
-
-      expect(custom.cardType.cardTypeId).toBe('programming.v1.ts-output');
-
-      const batchCreate = parseToolResult(await context.client.callTool({
-        name: 'create_drafts_batch',
+      const added = parseToolResult(await context.client.callTool({
+        name: 'add_notes_batch',
         arguments: {
           profileId: 'default',
           items: [
             {
               itemId: 'ok-1',
-              clientRequestId: 'mcp-batch-1',
-              cardTypeId: 'programming.v1.ts-output',
-              fields: { Front: 'Q', Back: 'A' },
+              clientRequestId: 'batch-1',
+              deckName: 'Programming::TypeScript::Output',
+              modelName: 'ts.v1.output',
+              fields: {
+                Code: 'console.log(1 + 1)',
+                Expected: '2',
+              },
             },
             {
               itemId: 'bad-1',
-              clientRequestId: 'mcp-batch-2',
-              cardTypeId: 'programming.v1.ts-output',
-              fields: { Front: 'Q only' },
+              clientRequestId: 'batch-2',
+              deckName: 'Programming::TypeScript::Output',
+              modelName: 'ts.v1.output',
+              fields: {
+                WrongField: 'x',
+              },
             },
           ],
         },
       }));
 
-      expect(batchCreate.summary).toEqual({ succeeded: 1, failed: 1 });
-      expect(batchCreate.results[0]?.ok).toBe(true);
-      expect(batchCreate.results[1]?.error?.code).toBe('INVALID_ARGUMENT');
+      expect(added.summary).toEqual({ succeeded: 1, failed: 1 });
+      expect(added.results.find((item: { itemId: string }) => item.itemId === 'ok-1')?.ok).toBe(true);
+      expect(added.results.find((item: { itemId: string }) => item.itemId === 'bad-1')?.ok).toBe(false);
 
-      const stagedDraftId = batchCreate.results[0]?.draft?.draftId as string;
-
-      const detail = parseToolResult(await context.client.callTool({
-        name: 'get_draft',
+      const createdNoteId = added.results.find((item: { itemId: string }) => item.itemId === 'ok-1')?.note.noteId;
+      const deleted = parseToolResult(await context.client.callTool({
+        name: 'delete_notes_batch',
         arguments: {
           profileId: 'default',
-          draftId: stagedDraftId,
+          items: [
+            { itemId: 'delete-created', noteId: createdNoteId },
+            { itemId: 'delete-missing', noteId: 999999 },
+          ],
         },
       }));
 
-      expect(detail.draft.draftId).toBe(stagedDraftId);
-      expect(detail.cardType.cardTypeId).toBe('programming.v1.ts-output');
+      expect(deleted.summary).toEqual({ succeeded: 2, failed: 0 });
+      expect(deleted.results.find((item: { itemId: string }) => item.itemId === 'delete-created')?.status).toBe('deleted');
+      expect(deleted.results.find((item: { itemId: string }) => item.itemId === 'delete-missing')?.status).toBe('already_deleted');
+    } finally {
+      await closeContext(context);
+    }
+  });
 
-      const listedBefore = parseToolResult(await context.client.callTool({
-        name: 'list_card_type_definitions',
-        arguments: { profileId: 'default' },
-      }));
-      expect(listedBefore.items).toHaveLength(1);
+  it('returns PROFILE_SCOPE_MISMATCH when a write tool targets a non-active profile', async () => {
+    const context = await createConnectedContext();
 
-      const deprecated = parseToolResult(await context.client.callTool({
-        name: 'deprecate_card_type_definition',
+    try {
+      const result = parseToolResult(await context.client.callTool({
+        name: 'ensure_deck',
         arguments: {
-          profileId: 'default',
-          cardTypeId: 'programming.v1.ts-output',
+          profileId: 'other-profile',
+          deckName: 'Programming::TypeScript::Concept',
         },
       }));
-      expect(deprecated.cardType.status).toBe('deprecated');
 
-      const listedActive = parseToolResult(await context.client.callTool({
-        name: 'list_card_type_definitions',
-        arguments: { profileId: 'default' },
-      }));
-      expect(listedActive.items).toHaveLength(0);
-
-      const listedAll = parseToolResult(await context.client.callTool({
-        name: 'list_card_type_definitions',
-        arguments: { profileId: 'default', includeDeprecated: true },
-      }));
-      expect(listedAll.items).toHaveLength(1);
-
-      const rejected = parseToolResult(await context.client.callTool({
-        name: 'create_draft',
-        arguments: {
-          profileId: 'default',
-          clientRequestId: 'mcp-deprecated-1',
-          cardTypeId: 'programming.v1.ts-output',
-          fields: { Front: 'Q', Back: 'A' },
-        },
-      }));
-      expect(rejected.code).toBe('CONFLICT');
+      expect(result).toMatchObject({
+        code: 'PROFILE_SCOPE_MISMATCH',
+      });
     } finally {
       await closeContext(context);
     }

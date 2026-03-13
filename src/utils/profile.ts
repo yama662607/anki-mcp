@@ -6,6 +6,15 @@ export function resolveProfileId(input: {
   requireExplicitForWrite: boolean;
 }): string {
   if (input.providedProfileId) {
+    if (input.activeProfileId && input.providedProfileId !== input.activeProfileId) {
+      throw new AppError('PROFILE_SCOPE_MISMATCH', 'profileId does not match the active Anki profile', {
+        hint: `Use the active profileId "${input.activeProfileId}" or switch Anki to the requested profile.`,
+        context: {
+          requestedProfileId: input.providedProfileId,
+          activeProfileId: input.activeProfileId,
+        },
+      });
+    }
     return input.providedProfileId;
   }
 

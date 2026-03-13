@@ -1,47 +1,30 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
-  applyStarterPackInputSchema,
-  cleanupDraftsInputSchema,
-  commitDraftsBatchInputSchema,
-  commitDraftInputSchema,
-  createDraftsBatchInputSchema,
-  createDraftInputSchema,
-  deprecateCardTypeDefinitionInputSchema,
-  deprecatePackManifestInputSchema,
-  importMediaAssetInputSchema,
-  getCardTypeSchemaInputSchema,
+  addNoteInputSchema,
+  addNotesBatchInputSchema,
+  deleteNoteInputSchema,
+  deleteNotesBatchInputSchema,
+  ensureDeckInputSchema,
   getNoteTypeSchemaInputSchema,
-  getPackManifestInputSchema,
-  getDraftInputSchema,
-  listCardTypeDefinitionsInputSchema,
-  listCardTypesInputSchema,
+  getNotesInputSchema,
+  importMediaAssetInputSchema,
+  listDecksInputSchema,
   listNoteTypesInputSchema,
-  listPackManifestsInputSchema,
-  listStarterPacksInputSchema,
-  listDraftsInputSchema,
-  openDraftPreviewInputSchema,
-  upsertPackManifestInputSchema,
-  upsertCardTypeDefinitionInputSchema,
+  openNotePreviewInputSchema,
+  searchNotesInputSchema,
+  setNoteCardsSuspendedInputSchema,
+  updateNoteInputSchema,
   upsertNoteTypeInputSchema,
-  discardDraftsBatchInputSchema,
-  discardDraftInputSchema,
 } from '../contracts/schemas.js';
-import { CatalogService } from '../services/catalogService.js';
-import { DraftService } from '../services/draftService.js';
 import { MediaService } from '../services/mediaService.js';
+import { NoteAuthoringService } from '../services/noteAuthoringService.js';
 import { NoteTypeService } from '../services/noteTypeService.js';
-import { PackManifestService } from '../services/packManifestService.js';
-import { StarterPackService } from '../services/starterPackService.js';
 import { getContractsResourcePayload } from './contractsResource.js';
 import { errorResult, parseOrThrow, successResult } from './result.js';
-import { resolveProfileId } from '../utils/profile.js';
 
 export function registerMcpHandlers(server: McpServer, services: {
-  catalogService: CatalogService;
-  draftService: DraftService;
   noteTypeService: NoteTypeService;
-  starterPackService: StarterPackService;
-  packManifestService: PackManifestService;
+  noteAuthoringService: NoteAuthoringService;
   mediaService: MediaService;
 }) {
   server.registerResource(
@@ -49,7 +32,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     'anki://contracts/v1/tools',
     {
       title: 'Anki MCP v1 Tool Contracts',
-      description: 'Frozen tool schemas and shared type registry for v1.',
+      description: 'Frozen tool schemas and shared type registry for the note-centric public API.',
       mimeType: 'application/json',
     },
     async (uri) => ({
@@ -63,150 +46,17 @@ export function registerMcpHandlers(server: McpServer, services: {
     }),
   );
 
-  server.registerResource(
-    'card_type_catalog',
-    'anki://catalog/card-types',
-    {
-      title: 'Anki Card Type Catalog',
-      description: 'Stable catalog definitions for card creation.',
-      mimeType: 'application/json',
-    },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: JSON.stringify(services.draftService.getCatalogResourcePayload(), null, 2),
-        },
-      ],
-    }),
-  );
-
-  server.registerResource(
-    'starter_pack_catalog',
-    'anki://starter-packs/catalog',
-    {
-      title: 'Anki Starter Pack Catalog',
-      description: 'Versioned starter packs for English, programming, and fundamentals authoring.',
-      mimeType: 'application/json',
-    },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: JSON.stringify(services.starterPackService.getCatalogResourcePayload(process.env.ANKI_ACTIVE_PROFILE), null, 2),
-        },
-      ],
-    }),
-  );
-
   server.registerTool(
-    'list_card_types',
+    'list_decks',
     {
-      title: 'List Card Types',
-      description: 'Return stable card type catalog entries.',
-      inputSchema: listCardTypesInputSchema,
+      title: 'List Decks',
+      description: 'List available Anki decks using official hierarchical deck names.',
+      inputSchema: listDecksInputSchema,
       annotations: { readOnlyHint: true },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(listCardTypesInputSchema, input);
-        const profileId = resolveProfileId({
-          providedProfileId: args.profileId,
-          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
-          requireExplicitForWrite: false,
-        });
-        const payload = {
-          contractVersion: '1.0.0',
-          profileId,
-          ...services.catalogService.listCardTypes(profileId),
-        };
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'list_card_type_definitions',
-    {
-      title: 'List Card Type Definitions',
-      description: 'List profile-scoped custom card type definitions. Active only by default.',
-      inputSchema: listCardTypeDefinitionsInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(listCardTypeDefinitionsInputSchema, input);
-        const profileId = resolveProfileId({
-          providedProfileId: args.profileId,
-          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
-          requireExplicitForWrite: false,
-        });
-        return successResult({
-          contractVersion: '1.0.0',
-          profileId,
-          ...services.catalogService.listCardTypeDefinitions(profileId, {
-            includeDeprecated: args.includeDeprecated,
-          }),
-        });
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'deprecate_card_type_definition',
-    {
-      title: 'Deprecate Card Type Definition',
-      description: 'Mark a custom card type definition as deprecated without deleting it.',
-      inputSchema: deprecateCardTypeDefinitionInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(deprecateCardTypeDefinitionInputSchema, input);
-        const profileId = resolveProfileId({
-          providedProfileId: args.profileId,
-          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
-          requireExplicitForWrite: true,
-        });
-        return successResult({
-          contractVersion: '1.0.0',
-          profileId,
-          ...services.catalogService.deprecateCardTypeDefinition(profileId, args.cardTypeId),
-        });
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'get_card_type_schema',
-    {
-      title: 'Get Card Type Schema',
-      description: 'Read schema details for one card type.',
-      inputSchema: getCardTypeSchemaInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(getCardTypeSchemaInputSchema, input);
-        const profileId = resolveProfileId({
-          providedProfileId: args.profileId,
-          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
-          requireExplicitForWrite: false,
-        });
-        const payload = {
-          contractVersion: '1.0.0',
-          profileId,
-          ...services.catalogService.getCardTypeSchema(profileId, args.cardTypeId),
-        };
-        return successResult(payload);
+        return successResult(await services.noteAuthoringService.listDecks(parseOrThrow(listDecksInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -217,68 +67,13 @@ export function registerMcpHandlers(server: McpServer, services: {
     'list_note_types',
     {
       title: 'List Note Types',
-      description: 'Return available Anki note types with field/template summaries.',
+      description: 'Return available Anki note types with field and template summaries.',
       inputSchema: listNoteTypesInputSchema,
       annotations: { readOnlyHint: true },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(listNoteTypesInputSchema, input);
-        return successResult(await services.noteTypeService.listNoteTypes(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'list_starter_packs',
-    {
-      title: 'List Starter Packs',
-      description: 'List versioned starter packs that bootstrap note types and custom card type definitions.',
-      inputSchema: listStarterPacksInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(listStarterPacksInputSchema, input);
-        return successResult(await services.starterPackService.listStarterPacks(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'list_pack_manifests',
-    {
-      title: 'List Pack Manifests',
-      description: 'List profile-scoped reusable custom pack manifests. Active only by default.',
-      inputSchema: listPackManifestsInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(listPackManifestsInputSchema, input);
-        return successResult(await services.packManifestService.listPackManifests(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'get_pack_manifest',
-    {
-      title: 'Get Pack Manifest',
-      description: 'Read the full manifest for one reusable custom pack.',
-      inputSchema: getPackManifestInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(getPackManifestInputSchema, input);
-        return successResult(await services.packManifestService.getPackManifest(args));
+        return successResult(await services.noteTypeService.listNoteTypes(parseOrThrow(listNoteTypesInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -295,8 +90,60 @@ export function registerMcpHandlers(server: McpServer, services: {
     },
     async (input) => {
       try {
-        const args = parseOrThrow(getNoteTypeSchemaInputSchema, input);
-        return successResult(await services.noteTypeService.getNoteTypeSchema(args));
+        return successResult(
+          await services.noteTypeService.getNoteTypeSchema(parseOrThrow(getNoteTypeSchemaInputSchema, input)),
+        );
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'search_notes',
+    {
+      title: 'Search Notes',
+      description: 'Search existing notes by Anki query, note type, deck, or tag filters.',
+      inputSchema: searchNotesInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(await services.noteAuthoringService.searchNotes(parseOrThrow(searchNotesInputSchema, input)));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_notes',
+    {
+      title: 'Get Notes',
+      description: 'Read concrete note fields and metadata by note ID.',
+      inputSchema: getNotesInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(await services.noteAuthoringService.getNotes(parseOrThrow(getNotesInputSchema, input)));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'ensure_deck',
+    {
+      title: 'Ensure Deck',
+      description: 'Create a deck if missing. Safe and idempotent.',
+      inputSchema: ensureDeckInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async (input) => {
+      try {
+        return successResult(await services.noteAuthoringService.ensureDeck(parseOrThrow(ensureDeckInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -307,14 +154,13 @@ export function registerMcpHandlers(server: McpServer, services: {
     'upsert_note_type',
     {
       title: 'Upsert Note Type',
-      description: 'Dry-run by default. Creates or updates a note type with additive-safe constraints.',
+      description: 'Dry-run by default. Create or update a note type with additive-safe constraints.',
       inputSchema: upsertNoteTypeInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(upsertNoteTypeInputSchema, input);
-        return successResult(await services.noteTypeService.upsertNoteType(args));
+        return successResult(await services.noteTypeService.upsertNoteType(parseOrThrow(upsertNoteTypeInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -322,17 +168,16 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
-    'upsert_pack_manifest',
+    'add_note',
     {
-      title: 'Upsert Pack Manifest',
-      description: 'Store a reusable custom pack manifest without applying it to Anki yet.',
-      inputSchema: upsertPackManifestInputSchema,
+      title: 'Add Note',
+      description: 'Create a review-pending note directly from deck, note type, fields, and tags.',
+      inputSchema: addNoteInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(upsertPackManifestInputSchema, input);
-        return successResult(await services.packManifestService.upsertPackManifest(args));
+        return successResult(await services.noteAuthoringService.addNote(parseOrThrow(addNoteInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -340,17 +185,18 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
-    'apply_starter_pack',
+    'add_notes_batch',
     {
-      title: 'Apply Starter Pack',
-      description: 'Dry-run by default. Provision note types and custom card type definitions for a supported learning pack.',
-      inputSchema: applyStarterPackInputSchema,
+      title: 'Add Notes Batch',
+      description: 'Create multiple review-pending notes with stable per-item outcomes.',
+      inputSchema: addNotesBatchInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(applyStarterPackInputSchema, input);
-        return successResult(await services.starterPackService.applyStarterPack(args));
+        return successResult(
+          await services.noteAuthoringService.addNotesBatch(parseOrThrow(addNotesBatchInputSchema, input)),
+        );
       } catch (error) {
         return errorResult(error);
       }
@@ -358,17 +204,16 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
-    'deprecate_pack_manifest',
+    'update_note',
     {
-      title: 'Deprecate Pack Manifest',
-      description: 'Mark a custom reusable pack manifest as deprecated without deleting it.',
-      inputSchema: deprecatePackManifestInputSchema,
+      title: 'Update Note',
+      description: 'Update note fields or tags with optimistic mod-timestamp conflict detection.',
+      inputSchema: updateNoteInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(deprecatePackManifestInputSchema, input);
-        return successResult(await services.packManifestService.deprecatePackManifest(args));
+        return successResult(await services.noteAuthoringService.updateNote(parseOrThrow(updateNoteInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }
@@ -376,27 +221,75 @@ export function registerMcpHandlers(server: McpServer, services: {
   );
 
   server.registerTool(
-    'upsert_card_type_definition',
+    'delete_note',
     {
-      title: 'Upsert Card Type Definition',
-      description: 'Store a profile-scoped custom card type definition that maps onto an Anki note type.',
-      inputSchema: upsertCardTypeDefinitionInputSchema,
+      title: 'Delete Note',
+      description: 'Delete a note directly by note ID. Idempotent when already missing.',
+      inputSchema: deleteNoteInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(await services.noteAuthoringService.deleteNote(parseOrThrow(deleteNoteInputSchema, input)));
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'delete_notes_batch',
+    {
+      title: 'Delete Notes Batch',
+      description: 'Delete multiple notes with stable per-item outcomes.',
+      inputSchema: deleteNotesBatchInputSchema,
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(
+          await services.noteAuthoringService.deleteNotesBatch(parseOrThrow(deleteNotesBatchInputSchema, input)),
+        );
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'open_note_preview',
+    {
+      title: 'Open Note Preview',
+      description: 'Open the existing note in Anki Browser preview for human review.',
+      inputSchema: openNotePreviewInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async (input) => {
+      try {
+        return successResult(
+          await services.noteAuthoringService.openNotePreview(parseOrThrow(openNotePreviewInputSchema, input)),
+        );
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'set_note_cards_suspended',
+    {
+      title: 'Set Note Cards Suspended',
+      description: 'Suspend or unsuspend all cards generated from one note.',
+      inputSchema: setNoteCardsSuspendedInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async (input) => {
       try {
-        const args = parseOrThrow(upsertCardTypeDefinitionInputSchema, input);
-        const profileId = resolveProfileId({
-          providedProfileId: args.profileId,
-          activeProfileId: process.env.ANKI_ACTIVE_PROFILE,
-          requireExplicitForWrite: true,
-        });
-        const payload = {
-          contractVersion: '1.0.0',
-          profileId,
-          cardType: services.catalogService.upsertCustomCardTypeDefinition(profileId, args.definition),
-        };
-        return successResult(payload);
+        return successResult(
+          await services.noteAuthoringService.setNoteCardsSuspended(
+            parseOrThrow(setNoteCardsSuspendedInputSchema, input),
+          ),
+        );
       } catch (error) {
         return errorResult(error);
       }
@@ -413,194 +306,7 @@ export function registerMcpHandlers(server: McpServer, services: {
     },
     async (input) => {
       try {
-        const args = parseOrThrow(importMediaAssetInputSchema, input);
-        return successResult(await services.mediaService.importMediaAsset(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'create_draft',
-    {
-      title: 'Create Draft',
-      description: 'Create a draft only (not committed). Requires profileId and clientRequestId.',
-      inputSchema: createDraftInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(createDraftInputSchema, input);
-        const payload = await services.draftService.createDraft(args);
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'create_drafts_batch',
-    {
-      title: 'Create Drafts Batch',
-      description: 'Create multiple drafts with per-item success and error reporting.',
-      inputSchema: createDraftsBatchInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(createDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.createDraftsBatch(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'get_draft',
-    {
-      title: 'Get Draft',
-      description: 'Read stored metadata and field contents for one draft.',
-      inputSchema: getDraftInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(getDraftInputSchema, input);
-        return successResult(await services.draftService.getDraft(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'open_draft_preview',
-    {
-      title: 'Open Draft Preview',
-      description: 'Open Anki Browser for visual review of a draft before commit/discard.',
-      inputSchema: openDraftPreviewInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(openDraftPreviewInputSchema, input);
-        const payload = await services.draftService.openDraftPreview(args);
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'commit_draft',
-    {
-      title: 'Commit Draft',
-      description: 'Finalize a draft after explicit user approval and full reviewDecision=true checks.',
-      inputSchema: commitDraftInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(commitDraftInputSchema, input);
-        const payload = await services.draftService.commitDraft(args);
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'commit_drafts_batch',
-    {
-      title: 'Commit Drafts Batch',
-      description: 'Commit multiple drafts with per-item review decisions and outcomes.',
-      inputSchema: commitDraftsBatchInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: false },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(commitDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.commitDraftsBatch(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'discard_draft',
-    {
-      title: 'Discard Draft',
-      description: 'Discard draft/superseded draft and remove the Anki note.',
-      inputSchema: discardDraftInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(discardDraftInputSchema, input);
-        const payload = await services.draftService.discardDraft(args);
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'discard_drafts_batch',
-    {
-      title: 'Discard Drafts Batch',
-      description: 'Discard multiple drafts with per-item success and idempotent already_discarded results.',
-      inputSchema: discardDraftsBatchInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(discardDraftsBatchInputSchema, input);
-        return successResult(await services.draftService.discardDraftsBatch(args));
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'list_drafts',
-    {
-      title: 'List Drafts',
-      description: 'List draft lifecycle records with cursor pagination.',
-      inputSchema: listDraftsInputSchema,
-      annotations: { readOnlyHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(listDraftsInputSchema, input);
-        const payload = services.draftService.listDrafts(args);
-        return successResult(payload);
-      } catch (error) {
-        return errorResult(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    'cleanup_drafts',
-    {
-      title: 'Cleanup Drafts',
-      description: 'Discard stale draft/superseded drafts older than threshold.',
-      inputSchema: cleanupDraftsInputSchema,
-      annotations: { readOnlyHint: false, destructiveHint: true },
-    },
-    async (input) => {
-      try {
-        const args = parseOrThrow(cleanupDraftsInputSchema, input);
-        const payload = await services.draftService.cleanupDrafts(args);
-        return successResult(payload);
+        return successResult(await services.mediaService.importMediaAsset(parseOrThrow(importMediaAssetInputSchema, input)));
       } catch (error) {
         return errorResult(error);
       }

@@ -1,89 +1,52 @@
-# GUI and Observability (Implementation Notes)
+# GUI and Observability
 
-## 3.x GUI preview and commit preconditions
+## GUI preview
 
-- Preview tool: `open_draft_preview`
-- Review completion inputs required at commit:
-  - `targetIdentityMatched=true`
-  - `questionConfirmed=true`
-  - `answerConfirmed=true`
-  - `reviewedAt`, `reviewer`
-- If checklist is incomplete, commit fails with `INVALID_ARGUMENT`.
+- Preview tool: `open_note_preview`
+- Primary path: `guiPreviewNote` from the optional `anki-connect-extension`
+- Fallback path: `guiBrowse -> guiSelectCard -> guiEditNote`
 
-## 4.1 read/write boundary
+The MCP server does not render HTML itself. Preview is delegated to the running Anki app so rendering stays faithful to the real note type and collection state.
 
-- Read-ish tools: `list_card_types`, `list_card_type_definitions`, `get_card_type_schema`, `get_draft`, `open_draft_preview`, `list_drafts`
-- Write tools: `create_draft`, `create_drafts_batch`, `commit_draft`, `commit_drafts_batch`, `discard_draft`, `discard_drafts_batch`, `cleanup_drafts`, `deprecate_card_type_definition`
+## Human review loop
 
-## 4.2 / 4.8 structured errors and canonical registry
+1. `add_note` or `add_notes_batch`
+2. `open_note_preview`
+3. user sends natural-language feedback
+4. agent calls `update_note`, `delete_note`, or `set_note_cards_suspended`
 
-- Envelope: `code`, `message`, `retryable`, `hint`, `context`
-- Canonical codes:
-  - `INVALID_ARGUMENT`
-  - `NOT_FOUND`
-  - `CONFLICT`
-  - `DEPENDENCY_UNAVAILABLE`
-  - `PROFILE_REQUIRED`
-  - `PROFILE_SCOPE_MISMATCH`
-  - `INVALID_STATE_TRANSITION`
-  - `INVALID_SUPERSEDE_SOURCE`
-  - `FORBIDDEN_OPERATION`
-- Source: `src/contracts/errors.ts`
+There is no separate public commit checklist object anymore.
 
-## 4.3 audit log schema and redaction
+## Structured errors
 
-- Emitted as structured JSON to stderr from draft lifecycle service.
-- Fields: `event`, `timestamp`, `profileId`, `draftId`, `noteId`, `state`, and limited operation metadata.
-- Sensitive content (field text) is intentionally excluded.
+- `INVALID_ARGUMENT`
+- `NOT_FOUND`
+- `CONFLICT`
+- `DEPENDENCY_UNAVAILABLE`
+- `PROFILE_REQUIRED`
+- `PROFILE_SCOPE_MISMATCH`
+- `FORBIDDEN_OPERATION`
 
-## 4.4 operational metrics
+Source: [errors.ts](/Users/daisukeyamashiki/Code/Projects/anki-mcps/src/contracts/errors.ts)
 
-Primary runtime metrics (derived from logs/store):
-- `draft_count{state,profileId}`
-- `commit_rate{profileId}`
-- `discard_rate{profileId}`
-- `cleanup_count{profileId}`
-- `conflict_count{profileId}`
-- `batch_item_success_count{operation,profileId}`
-- `batch_item_failure_count{operation,profileId}`
+## Audit logging
 
-## 4.5 profile-scoped identifiers
+Review-state transitions are emitted as structured JSON to stderr.
 
-- Draft store partition key includes `profileId`.
-- Lifecycle logs always include `profileId`.
+Current event families:
 
-## 4.6 conflict detection
+- `note_created`
+- `note_updated`
+- `note_deleted`
+- `note_suspended`
+- `note_unsuspended`
 
-- Fingerprint compares stored draft snapshot vs live Anki note snapshot at commit.
+Field contents are intentionally excluded from logs by default.
 
-## 4.7 no-force-commit
+## Internal persistence
 
-- No force path exists in API; manual conflict bypass is rejected via draft lifecycle rules.
+- DB default: `.data/anki-mcps.sqlite`
+- Env override: `ANKI_MCPS_DB_PATH`
+- Backward-compatible fallback: `DRAFT_DB_PATH`
 
-## 4.9 contract versioning policy
-
-- Current version: `1.0.0`.
-- Non-breaking: additive optional fields only.
-- Breaking: new major + parallel migration window.
-
-## 4.10 SQLite schema contract
-
-- DB: `.data/drafts.sqlite` (configurable via `DRAFT_DB_PATH`)
-- Table: `drafts`
-- Constraints:
-  - PK `(profile_id, draft_id)`
-  - UNIQUE `(profile_id, client_request_id)`
-- Indexes:
-  - `(profile_id, state, updated_at DESC)`
-  - `(profile_id, supersedes_draft_id)`
-- Terminal metadata retention purge: 30 days.
-
-## 4.11 contract URI and migration window
-
-- Fixed URI: `anki://contracts/v1/tools`
-- Migration rule: major version bump must keep prior major during migration window.
-
-## 4.12 write profile requirement
-
-- Write tools require explicit `profileId`.
-- Missing `profileId` => `PROFILE_REQUIRED`.
+This storage is internal metadata only. Public clients should not depend on table names or internal rows.
