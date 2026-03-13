@@ -297,6 +297,16 @@ export class NoteAuthoringService {
     }
 
     const updated = await this.ankiGateway.getNoteSnapshot(input.noteId);
+    if (input.tags && !this.sameTags(updated.tags, normalized.tags)) {
+      throw new AppError('DEPENDENCY_UNAVAILABLE', 'Updated note tags did not persist in Anki', {
+        hint: 'Read the note again before retrying. The Anki backend accepted the update but returned different tags.',
+        context: {
+          noteId: input.noteId,
+          requestedTags: normalized.tags,
+          persistedTags: updated.tags,
+        },
+      });
+    }
     this.logLifecycleEvent('note_updated', {
       profileId,
       noteId: updated.noteId,
@@ -554,6 +564,13 @@ export class NoteAuthoringService {
       succeeded: results.filter((item) => item.ok).length,
       failed: results.filter((item) => !item.ok).length,
     };
+  }
+
+  private sameTags(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+    return left.every((tag, index) => tag === right[index]);
   }
 
   private toNoteSummary(snapshot: NoteSnapshot): NoteSummary {

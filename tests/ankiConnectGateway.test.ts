@@ -188,6 +188,40 @@ describe('AnkiConnectGateway', () => {
         if (body.action === 'modelStyling') return ok({ css: '.card { color: black; }' });
         if (body.action === 'modelFieldsOnTemplates') {
           return ok({
+            'Card 1': [['Prompt'], ['Answer']],
+          });
+        }
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    const schema = await gateway.getNoteTypeSchema('ts.v1.concept');
+
+    expect(schema.modelName).toBe('ts.v1.concept');
+    expect(schema.fieldNames).toEqual(['Prompt', 'Answer']);
+    expect(schema.fieldsOnTemplates['Card 1']).toEqual({ front: ['Prompt'], back: ['Answer'] });
+  });
+
+  it('falls back to legacy field mapping shape for note type schema', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string; params: Record<string, unknown> };
+
+        if (body.action === 'modelNames') return ok(['ts.v1.concept']);
+        if (body.action === 'modelFieldNames') return ok(['Prompt', 'Answer']);
+        if (body.action === 'modelTemplates') {
+          return ok({
+            'Card 1': {
+              Front: '{{Prompt}}',
+              Back: '{{FrontSide}}<hr id=answer>{{Answer}}',
+            },
+          });
+        }
+        if (body.action === 'modelStyling') return ok({ css: '.card { color: black; }' });
+        if (body.action === 'modelFieldsOnTemplates') {
+          return ok({
             'Card 1': [
               { field: 'Prompt', ord: 0 },
               { field: 'Answer', ord: 1 },
@@ -201,8 +235,6 @@ describe('AnkiConnectGateway', () => {
     const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
     const schema = await gateway.getNoteTypeSchema('ts.v1.concept');
 
-    expect(schema.modelName).toBe('ts.v1.concept');
-    expect(schema.fieldNames).toEqual(['Prompt', 'Answer']);
     expect(schema.fieldsOnTemplates['Card 1']).toEqual({ front: ['Prompt'], back: ['Answer'] });
   });
 
@@ -287,10 +319,7 @@ describe('AnkiConnectGateway', () => {
         if (body.action === 'modelStyling') return ok({ css: '.card { color: black; }' });
         if (body.action === 'modelFieldsOnTemplates') {
           return ok({
-            'Card 1': [
-              { field: 'Code', ord: 0 },
-              { field: 'Expected', ord: 1 },
-            ],
+            'Card 1': [['Code'], ['Expected']],
           });
         }
         if (body.action === 'modelFieldAdd') return ok(null);
@@ -402,5 +431,42 @@ describe('AnkiConnectGateway', () => {
     expect(names).toEqual(['mcp-audio-deadbeef.mp3']);
     expect(stored.storedFilename).toBe('mcp-audio-deadbeef.mp3');
     expect(calls.map((call) => call.action)).toEqual(['getMediaFilesNames', 'storeMediaFile']);
+  });
+
+  it('updates note tags using add/remove diffs only', async () => {
+    const calls: FetchCall[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string; params: Record<string, unknown> };
+        calls.push({ action: body.action, params: body.params });
+
+        if (body.action === 'removeTags') return ok(null);
+        if (body.action === 'addTags') return ok(null);
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    await gateway.replaceNoteTags(1001, ['tag-a', 'tag-b'], ['tag-b', 'tag-c']);
+
+    expect(calls).toEqual([
+      { action: 'removeTags', params: { notes: [1001], tags: 'tag-a' } },
+      { action: 'addTags', params: { notes: [1001], tags: 'tag-c' } },
+    ]);
+  });
+
+  it('treats deleted-note placeholders as NOT_FOUND', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { action: string };
+        if (body.action === 'notesInfo') return ok([{}]);
+        throw new Error(`unexpected action: ${body.action}`);
+      }),
+    );
+
+    const gateway = new AnkiConnectGateway('http://127.0.0.1:8765');
+    await expect(gateway.getNoteSnapshot(404)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

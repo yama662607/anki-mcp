@@ -121,11 +121,16 @@ export class AnkiConnectGateway implements AnkiGateway {
   }
 
   async replaceNoteTags(noteId: number, currentTags: string[], nextTags: string[]): Promise<void> {
-    if (currentTags.length > 0) {
-      await this.call<null>('removeTags', { notes: [noteId], tags: currentTags.join(' ') });
+    const current = new Set(currentTags);
+    const next = new Set(nextTags);
+    const toRemove = currentTags.filter((tag) => !next.has(tag));
+    const toAdd = nextTags.filter((tag) => !current.has(tag));
+
+    if (toRemove.length > 0) {
+      await this.call<null>('removeTags', { notes: [noteId], tags: toRemove.join(' ') });
     }
-    if (nextTags.length > 0) {
-      await this.call<null>('addTags', { notes: [noteId], tags: nextTags.join(' ') });
+    if (toAdd.length > 0) {
+      await this.call<null>('addTags', { notes: [noteId], tags: toAdd.join(' ') });
     }
   }
 
@@ -200,9 +205,7 @@ export class AnkiConnectGateway implements AnkiGateway {
     const fieldNames = await this.call<string[]>('modelFieldNames', { modelName });
     const rawTemplates = await this.call<Record<string, { Front?: string; Back?: string }>>('modelTemplates', { modelName });
     const styling = await this.call<{ css?: string }>('modelStyling', { modelName });
-    const rawFieldsOnTemplates = await this.call<
-      Record<string, Array<{ field?: string; ord?: number }>>
-    >('modelFieldsOnTemplates', { modelName });
+    const rawFieldsOnTemplates = await this.call<Record<string, unknown>>('modelFieldsOnTemplates', { modelName });
 
     const templates = Object.entries(rawTemplates).map(([name, template]) => ({
       name,
@@ -339,26 +342,56 @@ export class AnkiConnectGateway implements AnkiGateway {
   private async getFirstNoteInfo(noteId: number): Promise<Record<string, any>> {
     const notes = await this.call<Record<string, any>[]>('notesInfo', { notes: [noteId] });
     const note = notes[0];
-    if (!note) {
+    if (!this.isUsableNoteInfo(note)) {
       throw new AppError('NOT_FOUND', `Note not found: ${noteId}`);
     }
     return note;
   }
 
   private normalizeFieldsOnTemplates(
-    raw: Record<string, Array<{ field?: string; ord?: number }>>,
+    raw: Record<string, unknown>,
   ): Record<string, { front: string[]; back: string[] }> {
     return Object.fromEntries(
       Object.entries(raw).map(([templateName, entries]) => {
-        const front = entries
-          .filter((entry) => entry.ord === 0 && typeof entry.field === 'string')
-          .map((entry) => entry.field as string);
-        const back = entries
-          .filter((entry) => entry.ord === 1 && typeof entry.field === 'string')
-          .map((entry) => entry.field as string);
+        const [front, back] = this.extractTemplateFieldRefs(entries);
         return [templateName, { front, back }];
       }),
     );
+  }
+
+  private extractTemplateFieldRefs(entries: unknown): [string[], string[]] {
+    if (
+      Array.isArray(entries)
+      && entries.length >= 2
+      && Array.isArray(entries[0])
+      && Array.isArray(entries[1])
+    ) {
+      return [
+        (entries[0] as unknown[]).filter((value): value is string => typeof value === 'string'),
+        (entries[1] as unknown[]).filter((value): value is string => typeof value === 'string'),
+      ];
+    }
+
+    if (Array.isArray(entries)) {
+      const front = entries
+        .filter((entry): entry is { field?: string; ord?: number } => typeof entry === 'object' && entry !== null)
+        .filter((entry) => entry.ord === 0 && typeof entry.field === 'string')
+        .map((entry) => entry.field as string);
+      const back = entries
+        .filter((entry): entry is { field?: string; ord?: number } => typeof entry === 'object' && entry !== null)
+        .filter((entry) => entry.ord === 1 && typeof entry.field === 'string')
+        .map((entry) => entry.field as string);
+      return [front, back];
+    }
+
+    return [[], []];
+  }
+
+  private isUsableNoteInfo(note: unknown): note is Record<string, any> {
+    return typeof note === 'object'
+      && note !== null
+      && typeof (note as { noteId?: unknown }).noteId === 'number'
+      && typeof (note as { modelName?: unknown }).modelName === 'string';
   }
 
   private detectCloze(templates: Array<{ front: string; back: string }>): boolean {

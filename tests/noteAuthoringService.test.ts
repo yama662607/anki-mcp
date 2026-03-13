@@ -161,6 +161,51 @@ describe('NoteAuthoringService', () => {
     store.close();
   });
 
+  it('rejects update_note when tag changes do not persist', async () => {
+    const store = new AuthoringStore(dbPath);
+    const gateway = new MemoryGateway();
+    const noteTypeService = new NoteTypeService(gateway, { activeProfileId: 'default' });
+    const noteAuthoringService = new NoteAuthoringService(store, gateway, { activeProfileId: 'default' });
+
+    await noteTypeService.upsertNoteType({
+      profileId: 'default',
+      modelName: 'ts.v1.concept',
+      dryRun: false,
+      fields: [{ name: 'Prompt' }, { name: 'Answer' }],
+      templates: [{ name: 'Card 1', front: '{{Prompt}}', back: '{{FrontSide}}<hr id=answer>{{Answer}}' }],
+    });
+    await noteAuthoringService.ensureDeck({
+      profileId: 'default',
+      deckName: 'Programming::TypeScript::Concept',
+    });
+
+    const added = await noteAuthoringService.addNote({
+      profileId: 'default',
+      deckName: 'Programming::TypeScript::Concept',
+      modelName: 'ts.v1.concept',
+      fields: {
+        Prompt: 'any と unknown の違いは？',
+        Answer: 'unknown は絞り込み後に使います。',
+      },
+      tags: ['language::typescript'],
+    });
+
+    gateway.replaceNoteTags = async () => {
+      // Simulate a dependency that accepts the request but leaves persisted tags unchanged.
+    };
+
+    await expect(
+      noteAuthoringService.updateNote({
+        profileId: 'default',
+        noteId: added.note.noteId,
+        expectedModTimestamp: added.note.modTimestamp,
+        tags: ['language::typescript', 'reviewed'],
+      }),
+    ).rejects.toMatchObject({ code: 'DEPENDENCY_UNAVAILABLE' });
+
+    store.close();
+  });
+
   it('deletes notes idempotently in batch form', async () => {
     const { store, noteTypeService, noteAuthoringService } = createServices();
 
