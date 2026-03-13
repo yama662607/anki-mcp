@@ -212,7 +212,7 @@ describe('NoteAuthoringService', () => {
     const noteTypeService = new NoteTypeService(gateway, { activeProfileId: 'default' });
     const noteAuthoringService = new NoteAuthoringService(store, gateway, {
       activeProfileId: 'default',
-      tagReadbackAttempts: 3,
+      tagReadbackAttempts: 5,
       tagReadbackDelayMs: 0,
     });
 
@@ -240,19 +240,21 @@ describe('NoteAuthoringService', () => {
     });
 
     const originalGetNoteSnapshot = gateway.getNoteSnapshot.bind(gateway);
-    let readCountAfterUpdate = 0;
+    let verifyingTags = false;
+    let verificationReads = 0;
     gateway.replaceNoteTags = async (_noteId, _currentTags, nextTags) => {
       gateway.mutateNote(added.note.noteId, (note) => {
         note.tags = [...nextTags];
       });
+      verifyingTags = true;
     };
     gateway.getNoteSnapshot = async (noteId) => {
       const snapshot = await originalGetNoteSnapshot(noteId);
-      if (noteId !== added.note.noteId || readCountAfterUpdate >= 2) {
+      if (noteId !== added.note.noteId || !verifyingTags) {
         return snapshot;
       }
-      readCountAfterUpdate += 1;
-      if (readCountAfterUpdate === 2) {
+      verificationReads += 1;
+      if (verificationReads === 4) {
         gateway.mutateNote(added.note.noteId, (note) => {
           note.tags = ['language::typescript'];
         });

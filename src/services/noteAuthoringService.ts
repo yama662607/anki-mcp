@@ -568,8 +568,8 @@ export class NoteAuthoringService {
   }
 
   private async readStableTaggedNote(noteId: number, expectedTags: string[]): Promise<NoteSnapshot> {
-    const attempts = Math.max(this.config.tagReadbackAttempts ?? 4, 2);
-    const delayMs = Math.max(this.config.tagReadbackDelayMs ?? 120, 0);
+    const attempts = Math.max(this.config.tagReadbackAttempts ?? 6, 2);
+    const delayMs = Math.max(this.config.tagReadbackDelayMs ?? 150, 0);
     let lastSnapshot: NoteSnapshot | undefined;
     let consecutiveMatches = 0;
 
@@ -579,9 +579,6 @@ export class NoteAuthoringService {
 
       if (this.sameTags(snapshot.tags, expectedTags)) {
         consecutiveMatches += 1;
-        if (consecutiveMatches >= 2) {
-          return snapshot;
-        }
       } else {
         consecutiveMatches = 0;
       }
@@ -589,6 +586,10 @@ export class NoteAuthoringService {
       if (attempt < attempts - 1) {
         await this.sleep(delayMs);
       }
+    }
+
+    if (lastSnapshot && consecutiveMatches >= 2 && this.sameTags(lastSnapshot.tags, expectedTags)) {
+      return lastSnapshot;
     }
 
     throw new AppError('DEPENDENCY_UNAVAILABLE', 'Updated note tags did not persist in Anki', {
