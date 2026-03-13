@@ -1,20 +1,48 @@
 {
   "name": "anki-mcps",
   "version": "0.1.0",
-  "description": "Anki MCP server with draft lifecycle and strict contracts",
+  "description": "Review-first MCP server for Anki authoring with note-centric workflows",
   "type": "module",
-  "private": true,
+  "private": false,
+  "license": "MIT",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "bin": {
+    "anki-mcps": "dist/src/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yama662607/anki-mcps.git"
+  },
+  "homepage": "https://github.com/yama662607/anki-mcps#readme",
+  "bugs": {
+    "url": "https://github.com/yama662607/anki-mcps/issues"
+  },
+  "keywords": [
+    "anki",
+    "mcp",
+    "model-context-protocol",
+    "flashcards",
+    "spaced-repetition",
+    "typescript"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:mcp": "vitest run tests/mcpServer.test.ts",
     "test:watch": "vitest",
     "dev": "tsx src/index.ts",
     "start": "node dist/src/index.js",
-    "e2e:anki": "node scripts/e2e-real-anki.mjs"
+    "e2e:anki": "node scripts/e2e-real-anki.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test && npm run typecheck"
   },
   "engines": {
     "node": ">=22"

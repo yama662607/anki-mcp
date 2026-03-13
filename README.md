@@ -14,13 +14,55 @@ TypeScript MCP server for review-first Anki authoring built on official Anki con
 - local media import for audio and image fields
 - frozen v1 contract resource at `anki://contracts/v1/tools`
 
-## Quick start
+## Requirements
+
+- Node.js 22+
+- Anki with AnkiConnect enabled
+- optional: the AnkiConnect extension add-on for the best preview UX
+
+## Installation
+
+### From npm
+
+```bash
+npm install -g anki-mcps
+```
+
+### From source
 
 ```bash
 npm install
-npm run typecheck
-npm test
+npm run build
+```
+
+## Running
+
+### As a local command
+
+```bash
+anki-mcps
+```
+
+### From source
+
+```bash
 npm run dev
+```
+
+## MCP client example
+
+```json
+{
+  "mcpServers": {
+    "anki-mcps": {
+      "command": "anki-mcps",
+      "env": {
+        "ANKI_CONNECT_URL": "http://127.0.0.1:8765",
+        "ANKI_ACTIVE_PROFILE": "default"
+      }
+    }
+  }
+}
 ```
 
 ## Environment
@@ -50,8 +92,12 @@ npm run dev
 
 ## Main docs
 
-- [Operating model](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/anki-operating-model.md)
-- [Contracts and tool surface](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/contracts-and-catalog.md)
-- [Note type authoring](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/note-type-authoring.md)
-- [Real Anki E2E](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/e2e-real-anki.md)
-- [Migration from pack/card-type APIs](/Users/daisukeyamashiki/Code/Projects/anki-mcps/docs/implementation/migration-note-centric.md)
+- [Operating model](docs/implementation/anki-operating-model.md)
+- [Contracts and tool surface](docs/implementation/contracts-and-catalog.md)
+- [Note type authoring](docs/implementation/note-type-authoring.md)
+- [Real Anki E2E](docs/implementation/e2e-real-anki.md)
+- [Migration from pack/card-type APIs](docs/implementation/migration-note-centric.md)
+
+## License
+
+MIT

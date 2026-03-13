@@ -27,7 +27,7 @@ There is no separate public commit checklist object anymore.
 - `PROFILE_SCOPE_MISMATCH`
 - `FORBIDDEN_OPERATION`
 
-Source: [errors.ts](/Users/daisukeyamashiki/Code/Projects/anki-mcps/src/contracts/errors.ts)
+Source: [errors.ts](../../src/contracts/errors.ts)
 
 ## Audit logging
 

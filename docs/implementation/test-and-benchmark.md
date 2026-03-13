@@ -4,8 +4,8 @@ The note-centric workflow is covered at three layers.
 
 ## Service tests
 
-- [noteAuthoringService.test.ts](/Users/daisukeyamashiki/Code/Projects/anki-mcps/tests/noteAuthoringService.test.ts)
-- [noteTypeService.test.ts](/Users/daisukeyamashiki/Code/Projects/anki-mcps/tests/noteTypeService.test.ts)
+- [noteAuthoringService.test.ts](../../tests/noteAuthoringService.test.ts)
+- [noteTypeService.test.ts](../../tests/noteTypeService.test.ts)
 
 Service-level note-centric assertions cover:
 
@@ -17,7 +17,7 @@ Service-level note-centric assertions cover:
 
 ## MCP tests
 
-- [mcpServer.test.ts](/Users/daisukeyamashiki/Code/Projects/anki-mcps/tests/mcpServer.test.ts)
+- [mcpServer.test.ts](../../tests/mcpServer.test.ts)
 
 MCP-level assertions cover:
 
@@ -29,6 +29,6 @@ MCP-level assertions cover:
 
 ## Live smoke
 
-- [scripts/e2e-real-anki.mjs](/Users/daisukeyamashiki/Code/Projects/anki-mcps/scripts/e2e-real-anki.mjs)
+- [scripts/e2e-real-anki.mjs](../../scripts/e2e-real-anki.mjs)
 
 The live smoke script is intentionally small. It validates the real workflow against a running Anki profile without introducing its own rendering model.
