@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { AnkiConnectGateway } from './gateway/ankiConnectGateway.js';
 import { MemoryGateway } from './gateway/memoryGateway.js';
@@ -10,6 +10,17 @@ import { NoteAuthoringService } from './services/noteAuthoringService.js';
 import { NoteTypeService } from './services/noteTypeService.js';
 import { RuntimeStatusService } from './services/runtimeStatusService.js';
 import { registerMcpHandlers } from './mcp/register.js';
+
+const packageJsonUrl = [
+  new URL('../package.json', import.meta.url),
+  new URL('../../package.json', import.meta.url),
+].find((candidate) => existsSync(candidate));
+
+if (!packageJsonUrl) {
+  throw new Error('Unable to locate package.json for MCP runtime version metadata.');
+}
+
+const appVersion = JSON.parse(readFileSync(packageJsonUrl, 'utf8')) as { version: string };
 
 export type AppRuntime = {
   server: McpServer;
@@ -35,7 +46,7 @@ export function createRuntime(): AppRuntime {
   const server = new McpServer(
     {
       name: 'anki-mcps',
-      version: '0.1.0',
+      version: appVersion.version,
     },
     {
       instructions: [
