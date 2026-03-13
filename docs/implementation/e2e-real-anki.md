@@ -69,3 +69,14 @@ ANKI_E2E_PROFILE_ID="your-profile" ANKI_E2E_MODE=batch ANKI_E2E_SCENARIO=finaliz
 5. Agent calls `update_note`, `set_note_cards_suspended`, or `delete_note`
 
 The smoke script mirrors that exact workflow.
+
+## Cleanup scope
+
+The smoke script guarantees note cleanup only.
+
+- temporary notes created by the script can be deleted automatically
+- empty test decks are not deleted by MCP
+- temporary note types are not deleted by MCP
+- imported media files are not deleted by MCP
+
+If you need a completely clean test namespace, remove the leftover deck or note type manually in the Anki app after the smoke run.

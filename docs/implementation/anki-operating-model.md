@@ -39,3 +39,20 @@ Use the read flow first when the agent needs to learn existing field conventions
 - `update_note` requires `expectedModTimestamp` and returns `CONFLICT` on stale data.
 - Public APIs do not expose `draft`, `pack`, or `card type definition`.
 - Internal idempotency bookkeeping may exist, but it is not part of the public workflow.
+
+## Cleanup boundary
+
+The public cleanup boundary is intentionally limited to notes.
+
+- MCP cleanup support includes `delete_note` and `delete_notes_batch`.
+- MCP does not currently expose deck deletion.
+- MCP does not currently expose note type deletion.
+- MCP does not currently expose media deletion.
+
+This is intentional:
+
+- note deletion is the common review-first authoring need
+- deck and note type deletion are higher-risk and easier to misuse
+- stock AnkiConnect does not provide a note type deletion action
+
+For temporary test namespaces, remove leftover decks or note types manually inside the Anki app when needed.
