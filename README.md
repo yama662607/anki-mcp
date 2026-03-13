@@ -1,5 +1,9 @@
 # anki-mcps
 
+[![npm version](https://img.shields.io/npm/v/anki-mcps)](https://www.npmjs.com/package/anki-mcps)
+[![CI](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 TypeScript MCP server for review-first Anki authoring built on official Anki concepts: `profile`, `deck`, `note type`, `note`, `card`, `tag`, and `media`.
 
 ## Features
@@ -97,6 +101,7 @@ npm run dev
 - [Note type authoring](docs/implementation/note-type-authoring.md)
 - [Real Anki E2E](docs/implementation/e2e-real-anki.md)
 - [Migration from pack/card-type APIs](docs/implementation/migration-note-centric.md)
+- [Public release checklist](docs/implementation/public-release-checklist.md)
 
 ## License
 
