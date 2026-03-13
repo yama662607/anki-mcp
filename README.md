@@ -4,7 +4,16 @@
 [![CI](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/yama662607/anki-mcps/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-TypeScript MCP server for review-first Anki authoring built on official Anki concepts: `profile`, `deck`, `note type`, `note`, `card`, `tag`, and `media`.
+MCP server for safe, review-first Anki authoring built on official Anki concepts: `profile`, `deck`, `note type`, `note`, `card`, `tag`, and `media`.
+
+It is designed for agents that need to inspect existing Anki structure, create or revise note types, add notes, preview the real Anki rendering, and only then release cards into study.
+
+## Why this exists
+
+- avoid custom abstractions on top of Anki's own data model
+- keep note creation review-first by suspending new cards until they are accepted
+- let agents learn from existing decks and note types before writing new content
+- keep note type changes additive-safe and validate them before apply
 
 ## Features
 
@@ -23,6 +32,16 @@ TypeScript MCP server for review-first Anki authoring built on official Anki con
 - Node.js 22+
 - Anki with AnkiConnect enabled
 - optional: the AnkiConnect extension add-on for the best preview UX
+
+## Quick start
+
+1. Install `anki-mcps` from npm.
+2. Start Anki with AnkiConnect enabled.
+3. Add the MCP server to your client config.
+4. Ask the agent to run `list_decks` or `list_note_types` first.
+5. Use the review-first flow: `add_note` -> `open_note_preview` -> `update_note` or `set_note_cards_suspended(false)`.
+
+For a first-time setup guide, see [5-minute quick start](docs/quickstart.md).
 
 ## Installation
 
@@ -96,6 +115,7 @@ npm run dev
 
 ## Main docs
 
+- [5-minute quick start](docs/quickstart.md)
 - [Operating model](docs/implementation/anki-operating-model.md)
 - [Contracts and tool surface](docs/implementation/contracts-and-catalog.md)
 - [Note type authoring](docs/implementation/note-type-authoring.md)

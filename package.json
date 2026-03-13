@@ -1,7 +1,7 @@
 {
   "name": "anki-mcps",
   "version": "0.1.0",
-  "description": "Review-first MCP server for Anki authoring with note-centric workflows",
+  "description": "MCP server for safe, review-first Anki authoring on official Anki concepts",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -25,10 +25,12 @@
   },
   "keywords": [
     "anki",
+    "anki-connect",
     "mcp",
     "model-context-protocol",
     "flashcards",
     "spaced-repetition",
+    "learning",
     "typescript"
   ],
   "scripts": {
