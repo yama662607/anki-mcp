@@ -1,17 +1,21 @@
 {
   "name": "@yama662607/anki-mcp",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "MCP server for safe, review-first Anki authoring on official Anki concepts",
   "type": "module",
   "private": false,
   "license": "MIT",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "anki-mcp": "dist/src/index.js"
   },
   "files": [
     "dist",
+    "scripts",
     "README.md",
     "LICENSE"
   ],
@@ -43,8 +47,10 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/src/index.js",
     "e2e:anki": "node scripts/e2e-real-anki.mjs",
+    "install:addon": "node scripts/install-anki-addon.mjs",
     "prepack": "npm run build",
-    "prepublishOnly": "npm test && npm run typecheck"
+    "prepublishOnly": "npm test && npm run typecheck",
+    "postinstall": "node scripts/install-anki-addon.mjs"
   },
   "engines": {
     "node": ">=22"
