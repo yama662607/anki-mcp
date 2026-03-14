@@ -1,6 +1,6 @@
 {
   "name": "@yama662607/anki-mcp",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "MCP server for safe, review-first Anki authoring on official Anki concepts",
   "type": "module",
   "private": false,

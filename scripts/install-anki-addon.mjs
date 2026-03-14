@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /**
- * AnkiConnect Extension Installer
- * Automatically downloads and installs the anki-connect-extension Anki addon.
+ * Anki Addons Installer
+ * Automatically downloads and installs AnkiConnect and anki-connect-extension Anki addons.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
-import { createReadStream, createWriteStream } from 'node:fs';
-import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Configuration
+const ANKICONNECT_REPO = 'FooSoft/anki-connect';
 const EXTENSION_REPO = 'yama662607/anki-connect-extension';
 const EXTENSION_NAME = 'anki_connect_extension';
 const GITHUB_API_BASE = 'https://api.github.com';
@@ -28,6 +27,7 @@ const colors = {
   blue: '\x1b[34m',
   red: '\x1b[31m',
   cyan: '\x1b[36m',
+  dim: '\x1b[2m',
 };
 
 function log(message, color = 'reset') {
@@ -106,8 +106,8 @@ function findAddonFolders() {
 /**
  * Fetch latest release information from GitHub
  */
-async function getLatestRelease() {
-  const url = `${GITHUB_API_BASE}/repos/${EXTENSION_REPO}/releases/latest`;
+async function getLatestRelease(repo) {
+  const url = `${GITHUB_API_BASE}/repos/${repo}/releases/latest`;
 
   try {
     const response = await fetch(url, {
@@ -121,7 +121,7 @@ async function getLatestRelease() {
       const body = await response.text();
       log(`  API Response (${response.status}): ${body}`, 'yellow');
       if (response.status === 404) {
-        throw new Error(`Repository ${EXTENSION_REPO} not found or no releases available`);
+        throw new Error(`Repository ${repo} not found or no releases available`);
       }
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
@@ -129,7 +129,7 @@ async function getLatestRelease() {
     const data = await response.json();
     return data;
   } catch (error) {
-    throw new Error(`Failed to fetch release info: ${error.message}`);
+    throw new Error(`Failed to fetch release info for ${repo}: ${error.message}`);
   }
 }
 
@@ -145,50 +145,135 @@ async function downloadFile(url, destPath) {
   // Ensure parent directory exists
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
-  // Stream the response to file
-  const fileStream = createWriteStream(destPath);
-  await pipeline(response.body, fileStream);
+  // Write file
+  const buffer = await response.arrayBuffer();
+  fs.writeFileSync(destPath, Buffer.from(buffer));
 }
 
 /**
- * Extract addon content from .ankiaddon file (which is a ZIP file)
- * Since we can't use external dependencies, we'll download individual files
+ * Install AnkiConnect addon
  */
-async function downloadAddonFiles(releaseData, destFolder) {
-  const tag = releaseData.tag_name;
-  const targetFolder = path.join(destFolder, EXTENSION_NAME);
+async function installAnkiConnect(addonFolder) {
+  logSection('Installing AnkiConnect');
 
-  // Create target folder
-  fs.mkdirSync(targetFolder, { recursive: true });
+  try {
+    // Get latest release
+    log('Fetching latest AnkiConnect release...', 'blue');
+    const releaseData = await getLatestRelease(ANKICONNECT_REPO);
+    const version = releaseData.tag_name;
+    log(`  Latest version: ${version}`, 'green');
 
-  // Download individual files from the repository
-  const filesToDownload = [
-    'addon/__init__.py',
-    'addon/manifest.json',
-  ];
-
-  log('Downloading addon files...', 'blue');
-
-  for (const file of filesToDownload) {
-    const url = `${GITHUB_RAW_BASE}/${EXTENSION_REPO}/${tag}/${file}`;
-    const destPath = path.join(targetFolder, path.basename(file));
-
-    try {
-      await downloadFile(url, destPath);
-      log(`  ✓ ${path.basename(file)}`, 'green');
-    } catch (err) {
-      throw new Error(`Failed to download ${file}: ${err.message}`);
+    // Check if already installed
+    const ankiConnectFolder = path.join(addonFolder, 'anki-connect');
+    if (fs.existsSync(ankiConnectFolder)) {
+      log('  AnkiConnect already installed, skipping...', 'yellow');
+      return { installed: false, alreadyExists: true };
     }
-  }
 
-  return targetFolder;
+    // Download AnkiConnect files from plugin folder
+    log('Downloading AnkiConnect files...', 'blue');
+
+    const filesToDownload = [
+      'plugin/__init__.py',
+      'plugin/config.json',
+      'plugin/config.md',
+      'plugin/edit.py',
+      'plugin/util.py',
+      'plugin/web.py',
+    ];
+
+    // Create target folder
+    fs.mkdirSync(ankiConnectFolder, { recursive: true });
+
+    for (const file of filesToDownload) {
+      const url = `${GITHUB_RAW_BASE}/${ANKICONNECT_REPO}/${version}/${file}`;
+      const destPath = path.join(ankiConnectFolder, path.basename(file));
+
+      try {
+        await downloadFile(url, destPath);
+        log(`  ✓ ${path.basename(file)}`, 'green');
+      } catch (err) {
+        throw new Error(`Failed to download ${file}: ${err.message}`);
+      }
+    }
+
+    // Verify installation
+    const initPath = path.join(ankiConnectFolder, '__init__.py');
+    if (!fs.existsSync(initPath)) {
+      throw new Error('AnkiConnect installation verification failed: __init__.py not found');
+    }
+
+    log(`✓ AnkiConnect v${version} installed successfully!`, 'green');
+    return { installed: true, version, path: ankiConnectFolder };
+
+  } catch (error) {
+    log(`✗ AnkiConnect installation failed: ${error.message}`, 'red');
+    return { installed: false, error: error.message };
+  }
+}
+
+/**
+ * Install anki-connect-extension addon
+ */
+async function installAnkiConnectExtension(addonFolder) {
+  logSection('Installing AnkiConnect Extension');
+
+  try {
+    // Get latest release
+    log('Fetching latest anki-connect-extension release...', 'blue');
+    const releaseData = await getLatestRelease(EXTENSION_REPO);
+    const version = releaseData.tag_name;
+    log(`  Latest version: ${version}`, 'green');
+
+    // Check if already installed
+    const extensionFolder = path.join(addonFolder, EXTENSION_NAME);
+    if (fs.existsSync(extensionFolder)) {
+      log('  anki-connect-extension already installed, updating...', 'yellow');
+    }
+
+    // Download addon files
+    log('Downloading addon files...', 'blue');
+
+    const filesToDownload = [
+      'addon/__init__.py',
+      'addon/manifest.json',
+    ];
+
+    // Create target folder
+    fs.mkdirSync(extensionFolder, { recursive: true });
+
+    for (const file of filesToDownload) {
+      const url = `${GITHUB_RAW_BASE}/${EXTENSION_REPO}/${version}/${file}`;
+      const destPath = path.join(extensionFolder, path.basename(file));
+
+      try {
+        await downloadFile(url, destPath);
+        log(`  ✓ ${path.basename(file)}`, 'green');
+      } catch (err) {
+        throw new Error(`Failed to download ${file}: ${err.message}`);
+      }
+    }
+
+    // Verify installation
+    const initPath = path.join(extensionFolder, '__init__.py');
+    if (!fs.existsSync(initPath)) {
+      throw new Error('Extension installation verification failed: __init__.py not found');
+    }
+
+    log(`✓ anki-connect-extension v${version} installed successfully!`, 'green');
+    return { installed: true, version, path: extensionFolder };
+
+  } catch (error) {
+    log(`✗ Extension installation failed: ${error.message}`, 'red');
+    return { installed: false, error: error.message };
+  }
 }
 
 /**
  * Main installation function
  */
 async function main() {
-  logSection('AnkiConnect Extension Installer');
+  logSection('Anki Addons Installer for anki-mcp');
 
   try {
     // Step 1: Find Anki addon folders
@@ -204,44 +289,58 @@ async function main() {
 
     log(`  Found ${addonFolders.length} addon folder(s):`, 'green');
     addonFolders.forEach(folder => {
-      log(`    - ${folder}`, 'reset');
+      log(`    - ${folder}`, 'dim');
     });
 
     // Use the first found folder
     const targetAddonFolder = addonFolders[0];
     log(`  Installing to: ${targetAddonFolder}`, 'green');
 
-    // Step 2: Get latest release info
-    log('Step 2: Fetching latest release from GitHub...', 'blue');
-    const releaseData = await getLatestRelease();
-    const version = releaseData.tag_name;
-    log(`  Latest version: ${version}`, 'green');
+    // Step 2: Install AnkiConnect
+    const ankiConnectResult = await installAnkiConnect(targetAddonFolder);
 
-    // Step 3: Download and install addon files
-    log('Step 3: Installing addon files...', 'blue');
-    const installedPath = await downloadAddonFiles(releaseData, targetAddonFolder);
+    // Step 3: Install anki-connect-extension
+    const extensionResult = await installAnkiConnectExtension(targetAddonFolder);
 
-    // Verify installation
-    const initPath = path.join(installedPath, '__init__.py');
-    if (!fs.existsSync(initPath)) {
-      throw new Error('Installation verification failed: __init__.py not found');
+    // Summary
+    logSection('Installation Summary');
+
+    const success = ankiConnectResult.installed || ankiConnectResult.alreadyExists;
+    const extensionSuccess = extensionResult.installed;
+
+    if (success && extensionSuccess) {
+      log('✓ All addons installed successfully!', 'green');
+      log('', 'reset');
+      log('Installed addons:', 'bright');
+      if (ankiConnectResult.installed) {
+        log(`  • AnkiConnect ${ankiConnectResult.version || 'latest'}`, 'cyan');
+      } else if (ankiConnectResult.alreadyExists) {
+        log(`  • AnkiConnect (already installed)`, 'cyan');
+      }
+      if (extensionResult.installed) {
+        log(`  • anki-connect-extension ${extensionResult.version || 'latest'}`, 'cyan');
+      }
+      log('', 'reset');
+      log('Next steps:', 'bright');
+      log('  1. Restart Anki if it is currently running', 'reset');
+      log('  2. The addons will be automatically loaded', 'reset');
+      log('  3. You can verify installation in Anki: Tools → Add-ons', 'reset');
+      log('', 'reset');
+
+      process.exit(0);
+    } else {
+      log('⚠ Some components could not be installed', 'yellow');
+      log('', 'reset');
+      if (!ankiConnectResult.installed && !ankiConnectResult.alreadyExists) {
+        log(`  • AnkiConnect: ${ankiConnectResult.error || 'Failed'}`, 'red');
+      }
+      if (!extensionResult.installed) {
+        log(`  • anki-connect-extension: ${extensionResult.error || 'Failed'}`, 'red');
+      }
+      log('', 'reset');
+
+      process.exit(1);
     }
-
-    // Success!
-    logSection('Installation Complete!');
-    log(`✓ AnkiConnect Extension v${version} installed successfully!`, 'green');
-    log('', 'reset');
-    log('Location:', 'bright');
-    log(`  ${installedPath}`, 'cyan');
-    log('', 'reset');
-    log('Next steps:', 'bright');
-    log('  1. Restart Anki if it is currently running', 'reset');
-    log('  2. The addon will be automatically loaded by AnkiConnect', 'reset');
-    log('  3. You can verify installation in Anki: Tools → Add-ons', 'reset');
-    log('', 'reset');
-
-    // Exit with success
-    process.exit(0);
 
   } catch (error) {
     log('', 'reset');
@@ -250,7 +349,9 @@ async function main() {
     log('', 'reset');
     log('Troubleshooting:', 'bright');
     log('  • Make sure you have internet connection', 'reset');
-    log('  • Check that the repository exists: https://github.com/yama662607/anki-connect-extension', 'reset');
+    log('  • Check that the repositories exist:', 'reset');
+    log('    - https://github.com/FooSoft/anki-connect', 'dim');
+    log('    - https://github.com/yama662607/anki-connect-extension', 'dim');
     log('  • Try manual installation from releases page', 'reset');
     log('', 'reset');
 
