@@ -47,7 +47,7 @@ Field contents are intentionally excluded from logs by default.
 
 ## Internal persistence
 
-- DB default: `.data/anki-mcp.sqlite`
+- DB default: user state directory (`~/Library/Application Support/anki-mcp/anki-mcp.sqlite` on macOS, `%LOCALAPPDATA%\anki-mcp\anki-mcp.sqlite` on Windows, `$XDG_STATE_HOME/anki-mcp/anki-mcp.sqlite` or `~/.local/state/anki-mcp/anki-mcp.sqlite` on Linux)
 - Env override: `ANKI_MCP_DB_PATH`
 - Backward-compatible fallback: `DRAFT_DB_PATH`
 

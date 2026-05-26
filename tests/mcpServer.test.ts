@@ -1,9 +1,10 @@
 import { rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { homedir, platform } from "node:os";
+import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
-import { createRuntime } from "../src/server.js";
+import { createRuntime, resolveAuthoringDbPath } from "../src/server.js";
 
 const dbPath = resolve(process.cwd(), ".data/test-mcp-server.sqlite");
 
@@ -52,6 +53,18 @@ async function closeContext(context: RuntimeContext) {
 }
 
 describe("MCP server", () => {
+  it("defaults the authoring database outside the project working directory", () => {
+    delete process.env.ANKI_MCP_DB_PATH;
+    delete process.env.ANKI_MCPS_DB_PATH;
+    delete process.env.DRAFT_DB_PATH;
+
+    const defaultPath = resolveAuthoringDbPath();
+    const oldProjectDefault = resolve(process.cwd(), ".data", "anki-mcp.sqlite");
+
+    expect(defaultPath).not.toBe(oldProjectDefault);
+    expect(defaultPath).toBe(join(expectedDefaultStateDir(), "anki-mcp.sqlite"));
+  });
+
   it("exposes note-centric tools with correct read/write annotations", async () => {
     const context = await createConnectedContext();
 
@@ -479,3 +492,15 @@ describe("MCP server", () => {
     }
   });
 });
+
+function expectedDefaultStateDir(): string {
+  if (platform() === "darwin") {
+    return join(homedir(), "Library", "Application Support", "anki-mcp");
+  }
+
+  if (platform() === "win32") {
+    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "anki-mcp");
+  }
+
+  return join(process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state"), "anki-mcp");
+}

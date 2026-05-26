@@ -1,6 +1,6 @@
 {
   "name": "@yama662607/anki-mcp",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "description": "MCP server for safe, review-first Anki authoring on official Anki concepts",
   "type": "module",
   "private": false,
@@ -11,7 +11,8 @@
     "access": "public"
   },
   "bin": {
-    "anki-mcp": "dist/src/index.js"
+    "anki-mcp": "dist/src/index.js",
+    "anki-mcps": "dist/src/index.js"
   },
   "files": [
     "dist",

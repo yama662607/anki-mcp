@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir, platform } from "node:os";
+import { join } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AnkiConnectGateway } from "./gateway/ankiConnectGateway.js";
@@ -27,16 +28,18 @@ export type AppRuntime = {
   store: AuthoringStore;
 };
 
-export function createRuntime(): AppRuntime {
-  const activeProfileId = process.env.ANKI_ACTIVE_PROFILE;
-  const dataDir = resolve(process.cwd(), ".data");
-  mkdirSync(dataDir, { recursive: true });
-
-  const dbPath =
+export function resolveAuthoringDbPath(): string {
+  return (
     process.env.ANKI_MCP_DB_PATH ??
     process.env.ANKI_MCPS_DB_PATH ??
     process.env.DRAFT_DB_PATH ??
-    resolve(dataDir, "anki-mcp.sqlite");
+    join(getDefaultStateDir(), "anki-mcp.sqlite")
+  );
+}
+
+export function createRuntime(): AppRuntime {
+  const activeProfileId = process.env.ANKI_ACTIVE_PROFILE;
+  const dbPath = resolveAuthoringDbPath();
 
   const gatewayMode = process.env.ANKI_GATEWAY_MODE ?? "anki-connect";
   const gateway = gatewayMode === "memory" ? new MemoryGateway() : new AnkiConnectGateway();
@@ -74,6 +77,18 @@ export function createRuntime(): AppRuntime {
   });
 
   return { server, store };
+}
+
+function getDefaultStateDir(): string {
+  if (platform() === "darwin") {
+    return join(homedir(), "Library", "Application Support", "anki-mcp");
+  }
+
+  if (platform() === "win32") {
+    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "anki-mcp");
+  }
+
+  return join(process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state"), "anki-mcp");
 }
 
 export async function runStdioServer(): Promise<void> {

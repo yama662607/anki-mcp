@@ -129,7 +129,7 @@ Some MCP clients use `mcpServers` JSON instead.
 
 - `ANKI_CONNECT_URL` default: `http://127.0.0.1:8765`
 - `ANKI_ACTIVE_PROFILE` optional fallback for read tools
-- `ANKI_MCP_DB_PATH` default: `.data/anki-mcp.sqlite`
+- `ANKI_MCP_DB_PATH` default: user state directory (`~/Library/Application Support/anki-mcp/anki-mcp.sqlite` on macOS, `%LOCALAPPDATA%\anki-mcp\anki-mcp.sqlite` on Windows, `$XDG_STATE_HOME/anki-mcp/anki-mcp.sqlite` or `~/.local/state/anki-mcp/anki-mcp.sqlite` on Linux)
 - `ANKI_GATEWAY_MODE=memory` for deterministic local tests without Anki
 
 `ANKI_MCP_DB_PATH` is the internal SQLite path used for idempotency and operational metadata. `DRAFT_DB_PATH` is still accepted as a backward-compatible fallback.
